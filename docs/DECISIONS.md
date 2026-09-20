@@ -105,3 +105,10 @@ Reason: inspection and recovery must remain possible without allowing task execu
 Decision: Android v0.5 uses native Kotlin/Room implementations of the common Event, AgentRun, Task/Checkpoint, Outbox, Persona/ContactProfile, and Journal contracts. Inbound admission, Outbox creation/transitions, and recovery classification remain transactional/deterministic; Android does not share the Desktop Python runtime.
 
 Reason: cross-platform correctness depends on invariant equivalence, not code reuse. Android lifecycle/process death requires platform-native persistence while preserving the same idempotency and uncertainty semantics.
+
+
+## ADR-018 — Standard Android notification identities and reply actions are capability-bounded
+
+Decision: the NotificationListener standard adapter treats QQ/TIM notification-derived account/conversation identifiers as local aliases with explicit identity-quality metadata, never as canonical QQ UINs. Shortcut/locus identifiers are preferred; title fallback is scoped to the notification slot to avoid merging same-name contacts. RemoteInput/PendingIntent reply actions are process-local ephemeral capabilities: they are cleared on listener disconnect, transport stop, notification removal, or an update that no longer exposes RemoteInput. They are never persisted. The notification transport does not advertise DELIVERY_LOOKUP.
+
+Reason: Android notification APIs do not guarantee canonical QQ identity or durable delivery history. Conservatively losing reply availability is safer than misrouting a reply or blindly replaying an ambiguous external send.
