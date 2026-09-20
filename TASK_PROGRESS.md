@@ -3,7 +3,7 @@
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
 Current milestone: v0.2 — Desktop Transport + Runtime Skeleton
-Current branch: `feature/android-agent-persistence`
+Current branch: `feature/desktop-v0.2-runtime`
 
 ## Current objective
 
@@ -56,12 +56,18 @@ Build the first Desktop runtime skeleton on top of the now-stable v0.1 contracts
 - Draft PR #1 opened as the v0.1 validation/review surface.
 - PR #1 Conformance workflow run #12 completed successfully; schema + invariant validator passed.
 - v0.1 common contracts are stable enough for runtime implementation.
+- Desktop Python package skeleton added (`desktop/pyproject.toml`).
+- Desktop `QbotConfig` added with validated node/database/spec settings.
+- SQLite bootstrap added with WAL, foreign keys, busy timeout, `qbot_meta`, and explicit transaction helper.
+- Platform-neutral `QQTransport` abstraction added.
+- Deterministic `MockTransport` added with idempotent dedupe-key delivery and delivery lookup.
+- Unit tests added for SQLite durability settings and MockTransport behavior.
+- Desktop GitHub Actions workflow added.
 
 ## In progress
 
-- Start Desktop v0.2 runtime skeleton.
-- Add SQLite WAL bootstrap and equivalent persistence primitives.
-- Add QQTransport abstraction and MockTransport before NapCat/OneBot.
+- Validate Desktop v0.2 bootstrap in CI.
+- Next: add normalized inbound admission + fingerprint dedupe + primary AgentRun creation.
 
 ## Not started
 
@@ -100,12 +106,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create Desktop v0.2 implementation branch from the v0.1 contract head.
-2. Add Python package layout and configuration model.
-3. Add SQLite WAL bootstrap + metadata table + transaction helpers.
-4. Add QQTransport protocol and MockTransport.
-5. Add tests for WAL/foreign-key setup and MockTransport behavior.
-6. Add NapCat/OneBot only after the Desktop skeleton passes its tests.
+1. Run Desktop Tests + Conformance CI on the v0.2 stacked PR and fix failures.
+2. Add persistent `inbound_events` and `agent_runs` tables.
+3. Implement event fingerprint dedupe admission transaction.
+4. Add per-conversation lock manager.
+5. Add minimal runtime flow: receive -> normalize -> admit -> create/restore run.
+6. Add NapCat/OneBot only after this core path passes tests.
 
 ## Resume rule
 
