@@ -20,6 +20,12 @@ interface QbotDao {
     @Query("SELECT * FROM inbound_events WHERE fingerprint = :fingerprint LIMIT 1")
     suspend fun inboundByFingerprint(fingerprint: String): InboundEventEntity?
 
+    @Query("SELECT * FROM inbound_events WHERE event_id = :eventId LIMIT 1")
+    suspend fun inboundById(eventId: String): InboundEventEntity?
+
+    @Query("SELECT COUNT(*) FROM inbound_events")
+    suspend fun inboundCount(): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAgentRun(run: AgentRunEntity)
 
@@ -30,6 +36,9 @@ interface QbotDao {
         "SELECT * FROM agent_runs WHERE trigger_event_id = :eventId LIMIT 1",
     )
     suspend fun agentRunByTriggerEvent(eventId: String): AgentRunEntity?
+
+    @Query("SELECT COUNT(*) FROM agent_runs")
+    suspend fun agentRunCount(): Int
 
     @Query(
         """
@@ -64,6 +73,9 @@ interface QbotDao {
 
     @Query("SELECT * FROM task_steps WHERE task_id = :taskId ORDER BY sequence")
     suspend fun taskSteps(taskId: String): List<TaskStepEntity>
+
+    @Query("SELECT * FROM tasks WHERE task_id = :taskId LIMIT 1")
+    suspend fun task(taskId: String): TaskEntity?
 
     @Query(
         """
@@ -130,6 +142,9 @@ interface QbotDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertJournal(event: JournalEntity)
+
+    @Query("SELECT COUNT(*) FROM event_journal")
+    suspend fun journalCount(): Int
 
     @Query(
         """
