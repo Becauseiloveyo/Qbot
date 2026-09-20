@@ -37,21 +37,22 @@ class ExplicitExperimentalTransportProvider(
         return TransportAdapterBinding(
             transport = transport,
             snapshot = {
+                val isHealthy = healthy()
                 TransportAdapterSnapshot(
                     adapterId = adapterId,
                     tier = AdapterTier.EXPERIMENTAL,
-                    health = if (healthy()) {
+                    health = if (isHealthy) {
                         AdapterHealth.READY
                     } else {
                         AdapterHealth.DEGRADED
                     },
-                    capabilities = if (healthy()) {
+                    capabilities = if (isHealthy) {
                         transport.capabilities
                     } else {
                         emptySet()
                     },
                     priority = priority,
-                    detail = if (healthy()) {
+                    detail = if (isHealthy) {
                         "explicitly enabled experimental transport"
                     } else {
                         "experimental transport is enabled but not healthy"
