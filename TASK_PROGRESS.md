@@ -3,7 +3,7 @@
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
 Current milestone: v0.4 — Durable Recovery + Policy
-Current branch: `feature/desktop-v0.3-agent-context`
+Current branch: `feature/desktop-v0.4-recovery-policy`
 
 ## Current objective
 
@@ -119,10 +119,20 @@ Complete v0.4 recovery/operations guarantees: startup recovery of unfinished run
 - Conformance #190 / Desktop Tests #164 passed for persona/env/assist gating; Conformance #192 / Desktop Tests #166 passed for the full context-reset durable continuation path.
 - v0.3 roadmap deliverables are complete.
 
+- Added deterministic `RecoveryPlanner` for non-terminal AgentRuns and Outbox effects.
+- Crash-left `SENDING` records are immediately reclassified to `SENDING_UNKNOWN` with a journaled uncertainty event.
+- Recovery classifies PENDING as safe send candidates, unknown delivery as reconcile/manual-review depending on `DELIVERY_LOOKUP`, WAITING_USER as preserved, and SENT+EXECUTING as local-only finalization; unknown sends are never blindly replayed.
+- Added recovery tests covering reconcile-capable and non-reconcile transports, PENDING effects, local finalization, resumable runs, and WAITING_USER preservation.
+- Added `TaskRepository` with atomic `start_step` / `complete_step`: task version + writer epoch guards, one RUNNING step, Task/TaskStep mutation, Checkpoint creation, and Journal entries commit in one transaction.
+- Added stale-version/stale-epoch rollback tests and automatic Task completion after the final step.
+- Added read-only `JournalRepository.query()` and `qbot-desktop journal` filtering by run/task/conversation/event type; inspection does not bootstrap or mutate an existing DB.
+- v0.4 draft PR #4 opened as the recovery/policy validation surface.
+- Conformance #213 and Desktop Tests #187 passed after RecoveryPlanner, transactional Task checkpoints, and journal inspection were added.
+
 ## In progress
 
-- Start startup recovery for unfinished AgentRuns and Outbox records.
-- Add deterministic recovery planning before any replayed side effect.
+- Wire RecoveryPlan execution into runtime startup with observe/assist-aware behavior.
+- Add backup -> migration -> integrity check -> Safe Mode bootstrap flow.
 
 ## Not started
 
@@ -158,13 +168,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create v0.4 implementation branch from the fully tested v0.3 head.
-2. Add startup RecoveryPlanner for non-terminal AgentRuns and PENDING/SENDING/SENDING_UNKNOWN Outbox rows.
-3. Never blindly replay `SENDING_UNKNOWN`; reconcile only when transport capability permits, otherwise surface manual recovery state.
-4. Add full TaskStep + Checkpoint commit repository with optimistic task version / writer-epoch checks.
-5. Add read-only event journal inspection CLI.
-6. Add backup -> migration -> integrity check -> Safe Mode bootstrap flow and tests.
-7. Add crash-injection recovery tests before moving to Android v0.5.
+1. Add RecoveryExecutor/startup integration: observe mode reports recovery items only; assist mode may execute only explicitly safe recovery actions.
+2. Finalize SENT-but-interrupted runs locally and reconcile unknown sends when `DELIVERY_LOOKUP` exists; never auto-resend unresolved unknown effects.
+3. Add database backup before migration, migration registry/version checks, post-migration integrity check, and Safe Mode on failure.
+4. Add Safe Mode CLI/diagnostics that disable task execution and external sends while preserving inspection/export/recovery access.
+5. Add crash-injection tests at Task checkpoint and Outbox boundaries.
+6. Complete v0.4 exit review, then start Android v0.5.
 
 ## Resume rule
 
