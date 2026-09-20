@@ -75,7 +75,7 @@ class StartupRecoveryWorker(
             WorkManager.getInstance(context.applicationContext)
                 .enqueueUniqueWork(
                     UNIQUE_WORK_NAME,
-                    ExistingWorkPolicy.KEEP,
+                    ExistingWorkPolicy.APPEND_OR_REPLACE,
                     request,
                 )
         }
