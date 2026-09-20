@@ -126,7 +126,7 @@ class ContextBuilder:
         ).strip()
         messages = (
             PromptMessage(role="system", content=system_content),
-            LlmMessage(role="user", content=current),
+            PromptMessage(role="user", content=current),
         )
         estimated = sum(self.estimator.estimate(m.content) for m in messages)
         return ContextBuildResult(
