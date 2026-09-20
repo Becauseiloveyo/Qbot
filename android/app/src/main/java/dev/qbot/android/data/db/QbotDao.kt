@@ -128,6 +128,18 @@ interface QbotDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertOutboxIfAbsent(message: OutboxMessageEntity): Long
 
+    @Query("SELECT * FROM outbox_messages WHERE outbox_id = :outboxId LIMIT 1")
+    suspend fun outbox(outboxId: String): OutboxMessageEntity?
+
+    @Query(
+        """
+        SELECT * FROM outbox_messages
+        WHERE run_id = :runId
+        ORDER BY created_at, outbox_id
+        """,
+    )
+    suspend fun outboxForRun(runId: String): List<OutboxMessageEntity>
+
     @Query(
         """
         SELECT * FROM outbox_messages
@@ -148,6 +160,34 @@ interface QbotDao {
         """,
     )
     suspend fun outboxByStatus(statuses: List<String>): List<OutboxMessageEntity>
+
+    @Query(
+        """
+        UPDATE outbox_messages
+        SET status = :targetStatus,
+            last_error = :error,
+            platform_message_id = CASE
+                WHEN :platformMessageId IS NULL THEN platform_message_id
+                ELSE :platformMessageId
+            END,
+            transport_attempts = transport_attempts + :attemptDelta,
+            sent_at = CASE
+                WHEN :targetStatus = 'SENT' THEN :sentAt
+                ELSE sent_at
+            END
+        WHERE outbox_id = :outboxId
+          AND status = :expectedStatus
+        """,
+    )
+    suspend fun transitionOutbox(
+        outboxId: String,
+        expectedStatus: String,
+        targetStatus: String,
+        platformMessageId: String?,
+        error: String?,
+        attemptDelta: Int,
+        sentAt: String?,
+    ): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertJournal(event: JournalEntity)
