@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 
 class QbotAccessibilityService : AccessibilityService() {
     private val scope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val transport: AccessibilityQQTransport by lazy {
         AccessibilityTransportProvider.get()
@@ -22,20 +22,27 @@ class QbotAccessibilityService : AccessibilityService() {
         AndroidAccessibilityUiDriver(this)
     }
 
+    private var lifecycleReady = false
     private var activeReadyKey: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+
         scope.launch {
             transport.start()
             transport.onServiceConnected()
+            lifecycleReady = true
+            refreshReplySession()
         }
-        refreshReplySession()
     }
 
     override fun onAccessibilityEvent(
         event: AccessibilityEvent,
     ) {
+        if (!lifecycleReady) {
+            return
+        }
+
         val packageName = event.packageName?.toString()
         if (packageName !in SUPPORTED_PACKAGES) {
             clearReplySession()
@@ -50,15 +57,14 @@ class QbotAccessibilityService : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        lifecycleReady = false
         clearReplySession()
         transport.onServiceDisconnected()
-        scope.launch {
-            transport.stop()
-        }
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
+        lifecycleReady = false
         clearReplySession()
         transport.onServiceDisconnected()
         scope.cancel()
@@ -66,6 +72,11 @@ class QbotAccessibilityService : AccessibilityService() {
     }
 
     private fun refreshReplySession() {
+        if (!lifecycleReady) {
+            clearReplySession()
+            return
+        }
+
         val spec = AccessibilitySessionSpecProvider.current()
         if (
             spec == null ||
@@ -96,8 +107,8 @@ class QbotAccessibilityService : AccessibilityService() {
         if (activeReadyKey != readyKey) {
             activeReadyKey = readyKey
             // A PENDING Outbox effect may have been deferred while no exact
-            // accessibility session existed. Revisit it only when the exact
-            // bound session transitions into READY.
+            // accessibility session existed. Revisit it only after transport
+            // lifecycle + exact UI validation have both reached READY.
             StartupRecoveryWorker.enqueue(this)
         }
     }
