@@ -11,6 +11,8 @@ import android.service.notification.StatusBarNotification
 import dev.qbot.android.transport.IncomingTransportEvent
 import dev.qbot.android.transport.OutgoingMessage
 import dev.qbot.android.transport.QQTransport
+import dev.qbot.android.transport.SendAvailability
+import dev.qbot.android.transport.SendReadiness
 import dev.qbot.android.transport.SendResult
 import dev.qbot.android.transport.TransportCapability
 import java.security.MessageDigest
@@ -83,6 +85,33 @@ class NotificationQQTransport(
             "notification transport is not started"
         }
         return incoming.receive()
+    }
+
+    override suspend fun checkSendReadiness(
+        message: OutgoingMessage,
+    ): SendReadiness {
+        if (!started) {
+            return SendReadiness(
+                SendAvailability.TEMPORARILY_UNAVAILABLE,
+                "notification transport is not started",
+            )
+        }
+
+        val action = replyActions[message.conversationId]
+            ?: return SendReadiness(
+                SendAvailability.TEMPORARILY_UNAVAILABLE,
+                "no live notification RemoteInput reply action",
+            )
+
+        val expectedAccountId = accountIdForPackage(action.packageName)
+        if (message.accountId != expectedAccountId) {
+            return SendReadiness(
+                SendAvailability.UNSUPPORTED,
+                "notification account identity does not match live reply action",
+            )
+        }
+
+        return SendReadiness(SendAvailability.READY)
     }
 
     override suspend fun send(message: OutgoingMessage): SendResult {
