@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.4 — Durable Recovery + Policy
+Current milestone: v0.5 — Android Standard Runtime
 Current branch: `feature/desktop-v0.4-recovery-policy`
 
 ## Current objective
 
-Complete v0.4 recovery/operations guarantees: startup recovery of unfinished runs/outbox effects, full task-step checkpoint commits, journal inspection, backup/migration/Safe Mode, and reconciliation workflows.
+Build the first Android standard runtime that mirrors the frozen durable contracts: Kotlin/Compose project, Room persistence, common-spec mappings, recoverable event processing, and a capability-bounded standard QQ adapter.
 
 ## Completed
 
@@ -129,10 +129,21 @@ Complete v0.4 recovery/operations guarantees: startup recovery of unfinished run
 - v0.4 draft PR #4 opened as the recovery/policy validation surface.
 - Conformance #213 and Desktop Tests #187 passed after RecoveryPlanner, transactional Task checkpoints, and journal inspection were added.
 
+- Added `RecoveryExecutor` and startup integration. Observe mode reports recovery only; assist mode executes only classified safe actions while MANUAL_REVIEW/WAITING_USER remain deferred.
+- Startup assist safely sends durable PENDING effects once, reconciles `SENDING_UNKNOWN` only through delivery lookup, finalizes SENT-but-interrupted AgentRuns locally, and is idempotent across repeated restarts.
+- Added startup restart integration tests proving observe performs no send and repeated assist restart does not duplicate an already SENT effect.
+- Replaced implicit schema overwrite behavior with explicit Desktop migration registry (v1->v2->v3), SQLite backup before migration, required-table validation, `integrity_check`, `foreign_key_check`, and `last_integrity_check_at` metadata.
+- Added in-memory BootstrapReport/Safe Mode state; authoritative `Database.transaction()` mutations are blocked while Safe Mode is active.
+- Safe Mode prevents QQ transport startup and RecoveryExecutor execution; `qbot-desktop safe-mode` provides read-only health diagnostics and optional consistent SQLite snapshot export.
+- Added migration tests proving the backup retains the pre-migration schema, known v1 migrates to v3, newer/unknown schema enters Safe Mode, and diagnostics do not mutate the database.
+- Added crash-injection tests: failure before checkpoint commit rolls back Task+Step+Checkpoint atomically; failure after remote delivery but before local SENT commit restarts as SENDING_UNKNOWN and reconciles without a second send.
+- Conformance #226 / Desktop Tests #200 passed for startup RecoveryExecutor integration; Conformance #241 / Desktop Tests #215 passed for backup/migration/Safe Mode; Conformance #243 / Desktop Tests #217 passed for crash-injection recovery.
+- v0.4 roadmap deliverables are complete.
+
 ## In progress
 
-- Wire RecoveryPlan execution into runtime startup with observe/assist-aware behavior.
-- Add backup -> migration -> integrity check -> Safe Mode bootstrap flow.
+- Create the Android v0.5 implementation branch and Gradle/Kotlin project skeleton.
+- Map the core Task/Checkpoint/AgentRun/Outbox/Event contracts into Room entities and DAOs.
 
 ## Not started
 
@@ -168,12 +179,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add RecoveryExecutor/startup integration: observe mode reports recovery items only; assist mode may execute only explicitly safe recovery actions.
-2. Finalize SENT-but-interrupted runs locally and reconcile unknown sends when `DELIVERY_LOOKUP` exists; never auto-resend unresolved unknown effects.
-3. Add database backup before migration, migration registry/version checks, post-migration integrity check, and Safe Mode on failure.
-4. Add Safe Mode CLI/diagnostics that disable task execution and external sends while preserving inspection/export/recovery access.
-5. Add crash-injection tests at Task checkpoint and Outbox boundaries.
-6. Complete v0.4 exit review, then start Android v0.5.
+1. Create `feature/android-v0.5-standard-runtime` from the tested v0.4 head.
+2. Add Android Gradle project using Kotlin, Jetpack Compose, Room, Coroutines/Flow, WorkManager, and DataStore without coupling Agent Core to QQ-specific APIs.
+3. Add Room entities/DAOs for inbound event, AgentRun, Task/TaskStep/Checkpoint, Outbox, Persona/ContactProfile, Journal, and metadata with the same uniqueness/version invariants as Desktop.
+4. Add Room migrations from the first schema onward; destructive migration fallback is forbidden.
+5. Add platform-neutral Android `QQTransport` capability interface and deterministic FakeTransport for tests.
+6. Add recoverable Android event pipeline: normalize -> dedupe -> per-conversation serialization -> AgentRun -> restore durable state.
+7. Add standard NotificationListener adapter boundary only after the durable fake end-to-end path passes tests.
 
 ## Resume rule
 
