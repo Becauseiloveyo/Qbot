@@ -50,12 +50,15 @@ Finish the common contracts and conformance rules that both Android and Desktop 
 - All current JSON schema/fixture files were parsed successfully as valid JSON.
 - Executable conformance validator added with JSON Schema Draft 2020-12 checks and cross-record invariants.
 - GitHub Actions conformance workflow added for Python 3.12.
+- `docs/PERSISTENCE.md` now defines equivalent Room/Desktop SQLite keys, transactions, optimistic concurrency, fencing, Outbox, journal, and migration semantics.
+- Added conformance fixtures for duplicate inbound events, duplicate Outbox dedupe keys, stale writer epochs, stale Task versions, and journal ordering.
+- Validator expanded to check those idempotency, fencing, versioning, checkpoint, and journal invariants.
+- Draft PR #1 opened as the v0.1 validation/review surface.
 
 ## In progress
 
-- Tighten cross-schema invariants that JSON Schema alone does not express.
-- Define v0.1 persistence mapping so Android Room and Desktop SQLite use equivalent semantics.
-- Expand executable invariant coverage beyond the first two conformance fixtures.
+- Run the expanded conformance suite through GitHub Actions and fix any failures.
+- Tighten any remaining cross-schema invariants exposed by CI.
 
 ## Not started
 
@@ -94,10 +97,10 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add persistence mapping document for Room and Desktop SQLite.
-2. Add journal/idempotency invariant tests.
-3. Run the conformance validator in CI and fix any schema/invariant failures.
-4. When v0.1 contracts pass, begin Desktop v0.2 runtime skeleton.
+1. Confirm PR #1 GitHub Actions conformance result and fix any failures.
+2. If CI passes, mark v0.1 contracts stable for implementation.
+3. Begin Desktop v0.2 runtime skeleton: package layout, SQLite WAL bootstrap, configuration, and MockTransport.
+4. Add NapCat/OneBot transport only after the Desktop core can pass the shared conformance contracts.
 
 ## Resume rule
 
