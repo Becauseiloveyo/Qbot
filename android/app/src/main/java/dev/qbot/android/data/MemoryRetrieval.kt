@@ -1,8 +1,10 @@
 package dev.qbot.android.data
 
+import android.icu.lang.UCharacter
 import dev.qbot.android.data.db.MemoryEntity
 import dev.qbot.android.data.db.QbotDatabase
 import java.text.Normalizer
+import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -272,9 +274,10 @@ class MemoryRetriever(
             ?: parseTimestamp(record.createdAt)
             ?: return 0
 
+        val duration = Duration.between(anchor, now)
         val ageSeconds = maxOf(
-            0L,
-            now.epochSecond - anchor.epochSecond,
+            0.0,
+            duration.seconds + duration.nano / 1_000_000_000.0,
         )
         val ageDays = ageSeconds / 86_400.0
         return when {
@@ -295,8 +298,7 @@ class MemoryRetriever(
             .thenByDescending { it.score.importanceMilli }
             .thenByDescending { it.score.trustMilli }
             .thenByDescending {
-                parseTimestamp(it.record.createdAt)?.epochSecond
-                    ?: Long.MIN_VALUE
+                parseTimestamp(it.record.createdAt) ?: Instant.MIN
             }
             .thenBy { it.record.memoryId }
 
@@ -354,10 +356,26 @@ class MemoryRetriever(
         val normalized = Normalizer.normalize(
             value,
             Normalizer.Form.NFKC,
-        ).lowercase(Locale.ROOT)
-        return normalized
-            .trim()
-            .replace(Regex("\\s+"), " ")
+        )
+        val folded = UCharacter.foldCase(normalized, true)
+        val result = StringBuilder()
+        var pendingSpace = false
+        for (char in folded) {
+            val isWhitespace =
+                Character.isWhitespace(char) ||
+                    Character.isSpaceChar(char) ||
+                    char == '\u0085'
+            if (isWhitespace) {
+                if (result.isNotEmpty()) pendingSpace = true
+                continue
+            }
+            if (pendingSpace) {
+                result.append(' ')
+                pendingSpace = false
+            }
+            result.append(char)
+        }
+        return result.toString()
     }
 
     private fun unitToMilli(value: Double): Int {
