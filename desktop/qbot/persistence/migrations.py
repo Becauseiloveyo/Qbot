@@ -7,6 +7,7 @@ from sqlalchemy.engine import Connection
 
 from .tables import (
     contact_profiles,
+    memories,
     personas,
     task_checkpoints,
     task_steps,
@@ -32,9 +33,14 @@ def _v2_to_v3(conn: Connection) -> None:
     contact_profiles.create(conn, checkfirst=True)
 
 
+def _v3_to_v4(conn: Connection) -> None:
+    memories.create(conn, checkfirst=True)
+
+
 MIGRATIONS: dict[int, Migration] = {
     1: Migration(1, 2, _v1_to_v2),
     2: Migration(2, 3, _v2_to_v3),
+    3: Migration(3, 4, _v3_to_v4),
 }
 
 
