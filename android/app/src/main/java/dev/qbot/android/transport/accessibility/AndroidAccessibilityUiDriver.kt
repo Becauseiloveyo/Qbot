@@ -7,20 +7,92 @@ import android.view.accessibility.AccessibilityNodeInfo
 class AndroidAccessibilityUiDriver(
     private val service: AccessibilityService,
 ) : AccessibilityUiDriver {
+    private data class ResolvedUi(
+        val inspection: AccessibilityUiInspection,
+        val composers: List<AccessibilityNodeInfo>,
+        val sendActions: List<AccessibilityNodeInfo>,
+    )
+
     override fun inspect(
         profile: AccessibilityUiProfile,
     ): AccessibilityUiInspection? {
         val root = service.rootInActiveWindow
             ?: return null
+        return resolve(root, profile).inspection
+    }
+
+    override fun setComposerText(
+        profile: AccessibilityUiProfile,
+        expectedConversationToken: String,
+        text: String,
+    ): Boolean {
+        val root = service.rootInActiveWindow
+            ?: return false
+        val resolved = resolve(root, profile)
+        if (
+            resolved.inspection.conversationToken !=
+            expectedConversationToken ||
+            !resolved.inspection.controlsAreUnambiguous
+        ) {
+            return false
+        }
+
+        val composer = resolved.composers.singleOrNull()
+            ?: return false
+        val arguments = Bundle().apply {
+            putCharSequence(
+                AccessibilityNodeInfo
+                    .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                text,
+            )
+        }
+
+        return composer.performAction(
+            AccessibilityNodeInfo.ACTION_SET_TEXT,
+            arguments,
+        )
+    }
+
+    override fun clickSend(
+        profile: AccessibilityUiProfile,
+        expectedConversationToken: String,
+    ): Boolean {
+        val root = service.rootInActiveWindow
+            ?: return false
+        val resolved = resolve(root, profile)
+        if (
+            resolved.inspection.conversationToken !=
+            expectedConversationToken ||
+            !resolved.inspection.controlsAreUnambiguous
+        ) {
+            return false
+        }
+
+        val send = resolved.sendActions.singleOrNull()
+            ?: return false
+        return send.performAction(
+            AccessibilityNodeInfo.ACTION_CLICK,
+        )
+    }
+
+    private fun resolve(
+        root: AccessibilityNodeInfo,
+        profile: AccessibilityUiProfile,
+    ): ResolvedUi {
         val packageName = root.packageName
             ?.toString()
-            ?: return null
+            .orEmpty()
+
         if (packageName != profile.packageName) {
-            return AccessibilityUiInspection(
-                packageName = packageName,
-                conversationToken = null,
-                composerMatches = 0,
-                sendActionMatches = 0,
+            return ResolvedUi(
+                inspection = AccessibilityUiInspection(
+                    packageName = packageName,
+                    conversationToken = null,
+                    composerMatches = 0,
+                    sendActionMatches = 0,
+                ),
+                composers = emptyList(),
+                sendActions = emptyList(),
             )
         }
 
@@ -43,65 +115,15 @@ class AndroidAccessibilityUiDriver(
             profile.sendActionViewIds,
         ).filter(::isSafeSendAction)
 
-        return AccessibilityUiInspection(
-            packageName = packageName,
-            conversationToken =
-                tokenValues.singleOrNull(),
-            composerMatches = composers.size,
-            sendActionMatches = sends.size,
-        )
-    }
-
-    override fun setComposerText(
-        profile: AccessibilityUiProfile,
-        text: String,
-    ): Boolean {
-        val root = service.rootInActiveWindow
-            ?: return false
-        if (root.packageName?.toString() != profile.packageName) {
-            return false
-        }
-
-        val composer = nodesByIds(
-            root,
-            profile.composerViewIds,
-        )
-            .filter(::isSafeComposer)
-            .singleOrNull()
-            ?: return false
-
-        val arguments = Bundle().apply {
-            putCharSequence(
-                AccessibilityNodeInfo
-                    .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                text,
-            )
-        }
-        return composer.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            arguments,
-        )
-    }
-
-    override fun clickSend(
-        profile: AccessibilityUiProfile,
-    ): Boolean {
-        val root = service.rootInActiveWindow
-            ?: return false
-        if (root.packageName?.toString() != profile.packageName) {
-            return false
-        }
-
-        val send = nodesByIds(
-            root,
-            profile.sendActionViewIds,
-        )
-            .filter(::isSafeSendAction)
-            .singleOrNull()
-            ?: return false
-
-        return send.performAction(
-            AccessibilityNodeInfo.ACTION_CLICK,
+        return ResolvedUi(
+            inspection = AccessibilityUiInspection(
+                packageName = packageName,
+                conversationToken = tokenValues.singleOrNull(),
+                composerMatches = composers.size,
+                sendActionMatches = sends.size,
+            ),
+            composers = composers,
+            sendActions = sends,
         )
     }
 
