@@ -8,8 +8,12 @@ class FakeTransport : QQTransport {
     private val incoming = Channel<IncomingTransportEvent>(Channel.UNLIMITED)
     private val deliveries = ConcurrentHashMap<Pair<String, String>, String>()
     private val counter = AtomicLong(0)
+
     @Volatile
     private var started = false
+
+    @Volatile
+    private var uncertainAfterNextDelivery = false
 
     override val name: String = "fake"
 
@@ -33,6 +37,10 @@ class FakeTransport : QQTransport {
         incoming.send(event)
     }
 
+    fun makeNextSendUncertainAfterDelivery() {
+        uncertainAfterNextDelivery = true
+    }
+
     override suspend fun receive(): IncomingTransportEvent {
         requireStarted()
         return incoming.receive()
@@ -44,6 +52,17 @@ class FakeTransport : QQTransport {
         val id = deliveries.computeIfAbsent(key) {
             "fake-msg-" + counter.incrementAndGet()
         }
+
+        if (uncertainAfterNextDelivery) {
+            uncertainAfterNextDelivery = false
+            return SendResult(
+                accepted = false,
+                platformMessageId = id,
+                uncertain = true,
+                error = "simulated acknowledgement loss after delivery",
+            )
+        }
+
         return SendResult(
             accepted = true,
             platformMessageId = id,
