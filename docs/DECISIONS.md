@@ -130,3 +130,11 @@ Decision: for a routed Outbox effect, the selected stable adapter ID is committe
 Accessibility enhanced sends additionally require a process-local exact conversation binding and a positively verified UI profile. The active conversation token and unambiguous composer/send controls are checked on each UI action; permission or service connectivity alone never implies `SEND_TEXT`.
 
 Reason: multi-adapter fallback is safe only before an external attempt. Persisting the routing identity closes the crash window between adapter selection and result recording, while exact per-action Accessibility validation reduces misrouting risk when the QQ/TIM UI changes concurrently.
+
+## ADR-021 — Deterministic memory retrieval precedes FTS and semantic acceleration
+
+Decision: Qbot v0.7 freezes memory eligibility and ranking independently from any retrieval index. Normal retrieval reads only `PROMOTED` memories, requires explicit scope/domain identifiers, excludes records outside their validity window, and filters out lexical/entity-irrelevant records when the query supplies relevance signals. The deterministic score uses integer components on a 0-1000 scale: keyword 40%, entity 20%, recency 15%, importance 10%, and trust 15%. Ties are resolved by component scores, then newer creation time, then `memory_id`.
+
+SQLite FTS5 and later semantic/embedding scorers are candidate accelerators or additional pluggable relevance signals only. They may not make CANDIDATE/REJECTED/SUPERSEDED memories eligible, bypass trust/domain boundaries, or change Active Task/Checkpoint force-loading.
+
+Reason: Android and Desktop must be able to reproduce the same memory selection before backend-specific indexing is introduced. Integer scoring and explicit domain filters reduce cross-runtime drift, while separating eligibility from acceleration prevents an FTS/vector index from becoming an accidental authority boundary.
