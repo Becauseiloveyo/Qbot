@@ -53,3 +53,45 @@ class BasicContextSource(ContextSource):
             checkpoint=None,
             current_message=event.text or "",
         )
+
+
+class DurableSqliteContextSource(ContextSource):
+    """Reload active Task/Checkpoint from SQLite on every decision."""
+
+    def __init__(
+        self,
+        *,
+        database,
+        system_policy: str,
+        persona: Persona,
+    ) -> None:
+        from qbot.persistence.context_state import ContextStateRepository
+
+        self.repository = ContextStateRepository(database)
+        self.system_policy = system_policy
+        self.persona = persona
+
+    async def load(
+        self,
+        *,
+        run_id: str,
+        event: NormalizedEvent,
+    ) -> ContextInput:
+        snapshot = self.repository.load(
+            conversation_id=event.conversation_id,
+            current_event_id=event.event_id,
+        )
+        return ContextInput(
+            system_policy=self.system_policy,
+            persona=self.persona,
+            contact=(
+                ContactProfile(contact_id=event.sender_id)
+                if event.sender_id
+                else None
+            ),
+            active_task=snapshot.active_task,
+            checkpoint=snapshot.checkpoint,
+            important_decisions=snapshot.important_decisions,
+            recent_messages=snapshot.recent_messages,
+            current_message=event.text or "",
+        )
