@@ -78,3 +78,10 @@ Reason: connecting a real QQ transport must not implicitly enable autonomous ext
 Decision: OpenAI-compatible provider base URL/model routing may come from environment configuration, but API keys remain runtime secrets (`SecretStr`) and are not persisted to the ordinary Qbot database/config.
 
 Reason: provider credentials are not agent memory or application state and should not leak through backups, prompts, journals, or normal configuration exports.
+
+
+## ADR-014 — Recovery plans classify before executing
+
+Decision: startup recovery first converts crash-left `SENDING` effects to `SENDING_UNKNOWN`, then builds a deterministic RecoveryPlan. Unknown delivery is reconciled only when the transport advertises `DELIVERY_LOOKUP`; otherwise it requires manual review. A locally `SENT` effect may finalize an interrupted AgentRun without resending.
+
+Reason: restart recovery must distinguish safe local repair from potentially duplicated external side effects.
