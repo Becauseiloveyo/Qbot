@@ -61,9 +61,18 @@ class LlmDecisionEngine:
         account_id: str | None = None,
         conversation_id: str | None = None,
     ) -> DecisionResult:
+        contract_tokens = self.context_builder.estimator.estimate(
+            _DECISION_CONTRACT
+        )
+        context_budget = self.max_input_tokens - contract_tokens
+        if context_budget <= 0:
+            raise ValueError(
+                "decision output contract alone exceeds model input budget"
+            )
+
         built = self.context_builder.build(
             context,
-            max_input_tokens=self.max_input_tokens,
+            max_input_tokens=context_budget,
         )
 
         messages = (
@@ -95,7 +104,9 @@ class LlmDecisionEngine:
                     "model": response.model,
                     "usage": response.usage,
                     "message_count": len(messages),
-                    "estimated_input_tokens": built.estimated_input_tokens,
+                    "estimated_input_tokens": (
+                        built.estimated_input_tokens + contract_tokens
+                    ),
                 },
             )
 
