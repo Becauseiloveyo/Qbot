@@ -18,6 +18,7 @@ data class RecoveryItem(
     val action: RecoveryAction,
     val runId: String,
     val outboxId: String? = null,
+    val transportId: String? = null,
     val reason: String,
 )
 
