@@ -155,9 +155,14 @@ class NotificationRecoveryRoomTest {
             assertEquals("SENT", outbox.load(liveEffect.outboxId).status)
             assertEquals(1, outbox.load(liveEffect.outboxId).transportAttempts)
             assertEquals("reply through live action", receivedText.get())
+            assertEquals("SUCCEEDED", runs.load(runId)?.status)
 
+            val expiredRunId = createExecutingRun(
+                accountId = notificationEvent.accountId,
+                conversationId = notificationEvent.conversationId,
+            )
             val expiredEffect = outbox.createText(
-                runId = runId,
+                runId = expiredRunId,
                 accountId = notificationEvent.accountId,
                 conversationId = notificationEvent.conversationId,
                 dedupeKey = "notification-expired-effect",
