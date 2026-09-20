@@ -1,0 +1,47 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "stale task version cannot overwrite newer task state",
+  "given": {
+    "active_task": {
+      "schema_version": "0.1.0",
+      "task_id": "task-version-1",
+      "conversation_id": "conv-1",
+      "parent_task_id": null,
+      "goal": "保持任务状态一致",
+      "status": "RUNNING",
+      "phase": "执行",
+      "constraints": [],
+      "steps": [
+        {
+          "step_id": "step-1",
+          "sequence": 1,
+          "description": "执行当前步骤",
+          "status": "RUNNING",
+          "result": null,
+          "error": null,
+          "started_at": "2026-09-20T06:30:00Z",
+          "completed_at": null
+        }
+      ],
+      "decisions": [],
+      "blockers": [],
+      "next_action": "继续",
+      "writer_epoch": 8,
+      "version": 6,
+      "created_at": "2026-09-20T06:00:00Z",
+      "updated_at": "2026-09-20T06:30:00Z"
+    },
+    "write_attempt": {
+      "task_id": "task-version-1",
+      "expected_version": 5,
+      "writer_epoch": 8,
+      "new_status": "COMPLETED"
+    },
+    "coordinator_epoch": 8
+  },
+  "expect": {
+    "authoritative_write_allowed": false,
+    "reason": "STALE_TASK_VERSION",
+    "task_version_after": 6
+  }
+}
