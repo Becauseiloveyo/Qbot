@@ -190,17 +190,25 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - Real QQ/TIM Accessibility UI profiles/view IDs are intentionally not guessed. Live profile calibration/verification against an actual device/app version remains an environment validation item, analogous to live NapCat verification in v0.2.
 - v0.6 roadmap deliverables are complete.
 
+- Added Desktop durable Hybrid Memory persistence with schema v4, provenance/trust fields, deterministic candidate idempotency, Candidate -> Promoted/Rejected transitions, append/supersede history, and authoritative MEMORY_PROMOTED journaling.
+- Desktop memory policy prevents CONTACT provenance from staging SYSTEM_POLICY or USER_PERSONA state and enforces required scope identity/provenance.
+- Added Android Room MemoryEntity parity and bumped Android Room schema to v2 with explicit non-destructive v1->v2 migration.
+- Added Android MemoryRepository parity for candidate staging, promotion/rejection, supersede-domain validation, idempotent provenance-derived candidates, and journaled authoritative promotion.
+- Added Android Room tests for trust boundaries, provenance requirements, idempotency, append/supersede history, rejected-state protection, and migration registry coverage.
+- v0.7 persistence/staging checkpoint passed: Android Tests #224, Desktop Tests #491, and Conformance #517 all succeeded on commit `cfa29a9`.
+
 ## In progress
 
-- Add Desktop and Android durable `memories` persistence with explicit migrations and equivalent provenance/trust fields.
-- Implement Candidate -> Promoted/Rejected transitions and append/supersede history with journaled authoritative promotion.
-- Add trust-boundary conformance so CONTACT content cannot become SYSTEM_POLICY or USER_PERSONA memory.
+- Implement deterministic memory retrieval over PROMOTED records: FTS/keyword, entity, temporal/recency, importance, and trust scoring.
+- Freeze deterministic filtering/scoring invariants before adding semantic retrieval or embeddings.
+- Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
 
 - Device-specific verified QQ/TIM Accessibility profile calibration.
 - Persona/contact UI.
-- Memory retrieval implementation.
+- Semantic retrieval as a pluggable scorer after deterministic retrieval is stable.
+- Background candidate extraction/summarization.
 - Coordinator and phone/PC synchronization.
 - Full management UI.
 
@@ -229,12 +237,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Finish Desktop memory schema v4 migration and MemoryRepository tests.
-2. Add Android Room MemoryEntity + explicit v1->v2 migration + repository parity tests.
-3. Add deterministic FTS/keyword, entity, temporal, importance and trust scoring; do not add embeddings yet.
-4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval is stable.
+1. Add a Desktop deterministic MemoryRetriever over PROMOTED memories with explicit domain/scope filters plus keyword/FTS, entity, temporal/recency, importance, and trust scoring.
+2. Add deterministic retrieval tests proving stable ordering, scope/domain isolation, and exclusion of CANDIDATE/REJECTED/SUPERSEDED records.
+3. Add the Android retrieval implementation only after the Desktop scoring contract is stable, then add cross-runtime parity fixtures.
+4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval is stable; do not make embeddings authoritative.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
-6. Add background candidate extraction/summarization only after durable staging/promotion works independently from indexing.
+6. Add background candidate extraction/summarization only after durable staging/promotion and deterministic retrieval work independently.
 7. Run v0.7 cross-runtime exit tests and update memory/security documentation.
 
 ## Resume rule
