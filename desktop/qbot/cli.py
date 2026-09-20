@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 from qbot.app import DesktopRuntime, build_runtime
@@ -10,6 +12,8 @@ from qbot.config import QbotConfig
 from qbot.llm import LlmDecisionEngine, ModelRole
 from qbot.llm.env_config import build_router_from_environment
 from qbot.logging import configure_logging
+from qbot.persistence import Database
+from qbot.persistence.journal import JournalRepository
 from qbot.persona import Persona
 from qbot.runtime.context_source import DurableSqliteContextSource
 from qbot.runtime.llm_decision import ContextualLlmDecisionEngine
@@ -73,6 +77,22 @@ def _parser() -> argparse.ArgumentParser:
         type=float,
         default=float(os.getenv("QBOT_ONEBOT_TIMEOUT", "10")),
     )
+
+
+    journal = sub.add_parser(
+        "journal",
+        help="Read event journal records without mutating Qbot state",
+    )
+    journal.add_argument(
+        "--db",
+        default=os.getenv("QBOT_DB", "./data/qbot.db"),
+    )
+    journal.add_argument("--run-id")
+    journal.add_argument("--task-id")
+    journal.add_argument("--conversation-id")
+    journal.add_argument("--event-type")
+    journal.add_argument("--limit", type=int, default=100)
+    journal.add_argument("--json", action="store_true")
 
     return parser
 
@@ -162,11 +182,60 @@ async def _diagnostic(args: argparse.Namespace) -> int:
         await transport.stop()
 
 
+async def _journal(args: argparse.Namespace) -> int:
+    db_path = Path(args.db)
+    if not db_path.exists():
+        raise FileNotFoundError(f"Qbot database does not exist: {db_path}")
+
+    db = Database(QbotConfig(database_path=db_path))
+    try:
+        records = JournalRepository(db).query(
+            run_id=args.run_id,
+            task_id=args.task_id,
+            conversation_id=args.conversation_id,
+            event_type=args.event_type,
+            limit=args.limit,
+        )
+    finally:
+        db.close()
+
+    if args.json:
+        print(
+            json.dumps(
+                [asdict(record) for record in records],
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+    else:
+        for record in records:
+            scope = " ".join(
+                part
+                for part in (
+                    f"run={record.run_id}" if record.run_id else "",
+                    f"task={record.task_id}" if record.task_id else "",
+                    (
+                        f"conversation={record.conversation_id}"
+                        if record.conversation_id
+                        else ""
+                    ),
+                )
+                if part
+            )
+            print(
+                f"{record.occurred_at} {record.event_type} "
+                f"actor={record.actor} {scope}".rstrip()
+            )
+    return 0
+
+
 async def _amain(args: argparse.Namespace) -> int:
     if args.command == "run":
         return await _run(args)
     if args.command == "diagnostic":
         return await _diagnostic(args)
+    if args.command == "journal":
+        return await _journal(args)
     raise RuntimeError(f"unsupported command: {args.command}")
 
 
