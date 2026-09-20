@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy import (
     Column,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -191,4 +193,56 @@ contact_profiles = Table(
     Column("persona_id", String, ForeignKey("personas.persona_id")),
     Column("version", Integer, nullable=False, default=1),
     Column("updated_at", String, nullable=False),
+)
+
+
+memories = Table(
+    "memories",
+    metadata,
+    Column("memory_id", String, primary_key=True),
+    Column("schema_version", String, nullable=False),
+    Column("state", String, nullable=False),
+    Column("scope", String, nullable=False),
+    Column("owner_id", String),
+    Column("conversation_id", String),
+    Column("task_id", String),
+    Column("content", Text, nullable=False),
+    Column("entities_json", Text, nullable=False, default="[]"),
+    Column("importance", Float),
+    Column("trust", Float, nullable=False),
+    Column("confidence", Float),
+    Column("source_type", String, nullable=False),
+    Column("source_message_id", String),
+    Column("source_event_id", String),
+    Column("valid_from", String),
+    Column("valid_to", String),
+    Column(
+        "supersedes",
+        String,
+        ForeignKey("memories.memory_id"),
+    ),
+    Column("created_at", String, nullable=False),
+)
+
+Index(
+    "ix_memories_conversation_state_created",
+    memories.c.conversation_id,
+    memories.c.state,
+    memories.c.created_at,
+)
+Index(
+    "ix_memories_task_state_created",
+    memories.c.task_id,
+    memories.c.state,
+    memories.c.created_at,
+)
+Index(
+    "ix_memories_scope_owner_state",
+    memories.c.scope,
+    memories.c.owner_id,
+    memories.c.state,
+)
+Index(
+    "ix_memories_source_event",
+    memories.c.source_event_id,
 )
