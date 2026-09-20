@@ -186,13 +186,13 @@ Add Android enhanced transport capabilities behind the existing platform-neutral
 - Added an experimental/root/hook provider boundary with no LSPosed/root dependency in the standard Android runtime. Experimental adapters are disabled by default and may be configured only before registry initialization.
 - Added enhanced status UI for Notification, Accessibility, and Shizuku.
 - Added regression tests for pre-send fallback, no fallback after an ambiguous external attempt, stable adapter-ID journaling, original-adapter-only reconciliation, Accessibility exact-addressing/session expiry, conversation changes between text entry and send, Shizuku state/permission mapping, and experimental-provider fail-closed behavior.
-- Android Tests #210 passed on the enhanced transport/routed recovery baseline; Desktop Tests #464 and Conformance #490 passed on the later exact-token code head. Android Tests #216 is the remaining exact-token hardening validation currently pending.
+- Android Tests #216, Desktop Tests #464, and Conformance #490 all passed on the exact-token v0.6 code head.
 - Real QQ/TIM Accessibility UI profiles/view IDs are intentionally not guessed. Live profile calibration/verification against an actual device/app version remains an environment validation item, analogous to live NapCat verification in v0.2.
+- v0.6 roadmap deliverables are complete.
 
 ## In progress
 
-- Complete Android Tests #216 for the exact-token Accessibility action hardening; if it fails, fix only the reported regression before closing v0.6.
-- Run the v0.6 exit review and then create the v0.7 Hybrid Memory branch from the verified v0.6 head.
+- Create the v0.7 Hybrid Memory branch from the verified v0.6 head and begin candidate-memory staging/provenance persistence.
 
 ## Not started
 
