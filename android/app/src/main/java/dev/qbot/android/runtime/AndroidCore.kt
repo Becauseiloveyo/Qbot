@@ -1,6 +1,7 @@
 package dev.qbot.android.runtime
 
 import dev.qbot.android.data.AdmissionResult
+import dev.qbot.android.data.AgentRunRepository
 import dev.qbot.android.data.DurableStateRepository
 import dev.qbot.android.data.InboundAdmissionRepository
 import dev.qbot.android.data.RestoredRunState
@@ -14,6 +15,7 @@ data class AndroidProcessResult(
 class AndroidCore(
     private val transport: QQTransport,
     private val admission: InboundAdmissionRepository,
+    private val runRepository: AgentRunRepository,
     private val stateRepository: DurableStateRepository,
     private val locks: ConversationLockManager = ConversationLockManager(),
     private val normalizer: EventNormalizer = EventNormalizer(
@@ -29,6 +31,7 @@ class AndroidCore(
             conversationId = event.conversationId,
         ) {
             val admitted = admission.admit(event)
+            runRepository.beginRestore(admitted.runId)
             AndroidProcessResult(
                 admission = admitted,
                 restored = stateRepository.restore(admitted.runId),
