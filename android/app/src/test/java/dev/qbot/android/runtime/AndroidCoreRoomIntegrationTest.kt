@@ -2,7 +2,9 @@ package dev.qbot.android.runtime
 
 import android.content.Context
 import androidx.room.Room
+import dev.qbot.android.data.AgentRunRepository
 import dev.qbot.android.data.DurableStateRepository
+import dev.qbot.android.data.InvalidAgentRunTransition
 import dev.qbot.android.data.InboundAdmissionRepository
 import dev.qbot.android.data.db.QbotDatabase
 import dev.qbot.android.data.db.QbotMigrations
@@ -69,6 +71,7 @@ class AndroidCoreRoomIntegrationTest {
                 database = database,
                 idFactory = { "id-" + ids.incrementAndGet() },
             ),
+            runRepository = AgentRunRepository(database.qbotDao()),
             stateRepository = DurableStateRepository(database.qbotDao()),
             normalizer = EventNormalizer(
                 transportName = transport.name,
@@ -91,7 +94,7 @@ class AndroidCoreRoomIntegrationTest {
         assertEquals(1, database.qbotDao().inboundCount())
         assertEquals(1, database.qbotDao().agentRunCount())
         assertEquals(2, database.qbotDao().journalCount())
-        assertEquals("CREATED", first.restored.run.status)
+        assertEquals("RESTORING", first.restored.run.status)
         assertNull(first.restored.activeTask)
         assertNull(first.restored.checkpoint)
 
@@ -130,6 +133,7 @@ class AndroidCoreRoomIntegrationTest {
                 database = database,
                 idFactory = { "id-" + ids.incrementAndGet() },
             ),
+            runRepository = AgentRunRepository(database.qbotDao()),
             stateRepository = DurableStateRepository(database.qbotDao()),
             normalizer = EventNormalizer(
                 transportName = transport.name,
@@ -213,6 +217,64 @@ class AndroidCoreRoomIntegrationTest {
         assertEquals("checkpoint-current", restored.checkpoint?.checkpointId)
         assertEquals("current checkpoint", restored.checkpoint?.summary)
         assertEquals("resume phase 2", restored.checkpoint?.nextAction)
+    }
+
+    @Test
+    fun agentRunStateMachineSurvivesDatabaseRestart() = runBlocking {
+        val transport = FakeTransport()
+        transport.inject(
+            IncomingTransportEvent(
+                accountId = "acc-1",
+                conversationId = "private:state-machine",
+                senderId = "contact-state",
+                platformMessageId = "msg-state",
+                text = "state",
+                occurredAt = Instant.parse("2026-09-20T02:00:00Z"),
+            ),
+        )
+        transport.start()
+
+        val ids = AtomicInteger(200)
+        val core = AndroidCore(
+            transport = transport,
+            admission = InboundAdmissionRepository(
+                database = database,
+                idFactory = { "id-" + ids.incrementAndGet() },
+            ),
+            runRepository = AgentRunRepository(database.qbotDao()),
+            stateRepository = DurableStateRepository(database.qbotDao()),
+            normalizer = EventNormalizer(
+                transportName = transport.name,
+                idFactory = { "event-" + ids.incrementAndGet() },
+            ),
+        )
+        val processed = core.processOne()
+        transport.stop()
+
+        val repository = AgentRunRepository(database.qbotDao())
+        val reasoning = repository.transition(
+            processed.admission.runId,
+            "REASONING",
+        )
+        assertEquals("REASONING", reasoning.status)
+
+        try {
+            repository.transition(processed.admission.runId, "RESTORING")
+            throw AssertionError("illegal transition should have failed")
+        } catch (_: InvalidAgentRunTransition) {
+            // Expected.
+        }
+
+        val runId = processed.admission.runId
+        database.close()
+        database = openDatabase()
+
+        val reopened = AgentRunRepository(database.qbotDao())
+        val active = reopened.listNonTerminal()
+
+        assertEquals(1, active.size)
+        assertEquals(runId, active.single().runId)
+        assertEquals("REASONING", active.single().status)
     }
 
     private fun openDatabase(): QbotDatabase =
