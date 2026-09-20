@@ -77,6 +77,7 @@ class NotificationQQTransport(
 
     override suspend fun stop() {
         started = false
+        replyActions.clear()
         updateHealth()
     }
 
@@ -187,13 +188,19 @@ class NotificationQQTransport(
             ?: return false
 
         val identity = identityResolver.resolve(sbn)
-        findReplyAction(sbn.notification)?.let { candidate ->
+        val replyCandidate = findReplyAction(sbn.notification)
+        if (replyCandidate != null) {
             replyActions[identity.conversationId] = LiveReplyAction(
                 notificationKey = sbn.key,
                 packageName = sbn.packageName,
-                remoteInputs = candidate.first,
-                pendingIntent = candidate.second,
+                remoteInputs = replyCandidate.first,
+                pendingIntent = replyCandidate.second,
             )
+        } else {
+            // A notification update without RemoteInput invalidates any
+            // previously cached action for this conversation. Conservatively
+            // prefer deferring a send over using a stale PendingIntent.
+            replyActions.remove(identity.conversationId)
         }
 
         val title = extractTitle(sbn.notification)
