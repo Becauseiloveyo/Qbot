@@ -120,6 +120,21 @@ class OutboxRepository:
             ) from exc
         return self.load(outbox_id)
 
+    def find_by_dedupe(
+        self,
+        *,
+        account_id: str,
+        dedupe_key: str,
+    ) -> OutboxRecord | None:
+        with self.database.engine.connect() as conn:
+            row = conn.execute(
+                select(outbox_messages).where(
+                    outbox_messages.c.account_id == account_id,
+                    outbox_messages.c.dedupe_key == dedupe_key,
+                )
+            ).mappings().one_or_none()
+        return OutboxRecord(**dict(row)) if row is not None else None
+
     def load(self, outbox_id: str) -> OutboxRecord:
         with self.database.engine.connect() as conn:
             row = conn.execute(
