@@ -64,7 +64,10 @@ class StartupRecoveryIntegrationTests(unittest.IsolatedAsyncioTestCase):
             transport=MockTransport(),
         )
         try:
-            report = await runtime.start(RecoveryMode.OBSERVE)
+            start_report = await runtime.start(RecoveryMode.OBSERVE)
+            self.assertFalse(start_report.safe_mode)
+            report = start_report.recovery
+            self.assertIsNotNone(report)
             self.assertEqual(report.mode, RecoveryMode.OBSERVE)
             self.assertEqual(runtime.core.outbox.load(outbox_id).status, "PENDING")
             self.assertEqual(runtime.core.runs.load(run_id).status, "EXECUTING")
@@ -88,7 +91,10 @@ class StartupRecoveryIntegrationTests(unittest.IsolatedAsyncioTestCase):
             transport=transport,
         )
         try:
-            report = await runtime.start(RecoveryMode.ASSIST)
+            start_report = await runtime.start(RecoveryMode.ASSIST)
+            self.assertFalse(start_report.safe_mode)
+            report = start_report.recovery
+            self.assertIsNotNone(report)
             recovered = runtime.core.outbox.load(outbox_id)
             self.assertEqual(recovered.status, "SENT")
             self.assertEqual(recovered.transport_attempts, 1)
@@ -112,7 +118,8 @@ class StartupRecoveryIntegrationTests(unittest.IsolatedAsyncioTestCase):
             transport=MockTransport(),
         )
         try:
-            await first.start(RecoveryMode.ASSIST)
+            first_report = await first.start(RecoveryMode.ASSIST)
+            self.assertFalse(first_report.safe_mode)
             first_record = first.core.outbox.load(outbox_id)
             self.assertEqual(first_record.status, "SENT")
             self.assertEqual(first_record.transport_attempts, 1)
@@ -124,7 +131,10 @@ class StartupRecoveryIntegrationTests(unittest.IsolatedAsyncioTestCase):
             transport=MockTransport(),
         )
         try:
-            report = await second.start(RecoveryMode.ASSIST)
+            start_report = await second.start(RecoveryMode.ASSIST)
+            self.assertFalse(start_report.safe_mode)
+            report = start_report.recovery
+            self.assertIsNotNone(report)
             second_record = second.core.outbox.load(outbox_id)
             self.assertEqual(second_record.status, "SENT")
             self.assertEqual(second_record.transport_attempts, 1)
