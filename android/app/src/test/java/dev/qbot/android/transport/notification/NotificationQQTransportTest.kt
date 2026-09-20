@@ -43,7 +43,7 @@ class NotificationQQTransportTest {
     fun tearDown() = Unit
 
     @Test
-    fun titleFallbackIsStableAcrossNotificationSlotsAndQualityIsExplicit() {
+    fun titleSlotFallbackIsStableOnlyWithinSameNotificationSlot() {
         val resolver = NotificationConversationIdentityResolver()
         val first = statusBarNotification(
             packageName = "com.tencent.mobileqq",
@@ -53,9 +53,15 @@ class NotificationQQTransportTest {
         )
         val second = statusBarNotification(
             packageName = "com.tencent.mobileqq",
-            id = 99,
+            id = 1,
             title = "Alice",
             text = "new message",
+        )
+        val sameTitleOtherSlot = statusBarNotification(
+            packageName = "com.tencent.mobileqq",
+            id = 99,
+            title = "Alice",
+            text = "different slot",
         )
         val other = statusBarNotification(
             packageName = "com.tencent.mobileqq",
@@ -66,15 +72,22 @@ class NotificationQQTransportTest {
 
         val firstIdentity = resolver.resolve(first)
         val secondIdentity = resolver.resolve(second)
+        val sameTitleOtherSlotIdentity = resolver.resolve(
+            sameTitleOtherSlot,
+        )
         val otherIdentity = resolver.resolve(other)
 
         assertEquals(
-            ConversationIdentityQuality.TITLE_FALLBACK,
+            ConversationIdentityQuality.TITLE_SLOT_FALLBACK,
             firstIdentity.quality,
         )
         assertEquals(
             firstIdentity.conversationId,
             secondIdentity.conversationId,
+        )
+        assertNotEquals(
+            firstIdentity.conversationId,
+            sameTitleOtherSlotIdentity.conversationId,
         )
         assertNotEquals(
             firstIdentity.conversationId,
@@ -125,7 +138,7 @@ class NotificationQQTransportTest {
         )
         assertEquals("hello from QQ", event.text)
         assertEquals(
-            "TITLE_FALLBACK",
+            "TITLE_SLOT_FALLBACK",
             event.metadata["identity_quality"],
         )
         assertEquals(
