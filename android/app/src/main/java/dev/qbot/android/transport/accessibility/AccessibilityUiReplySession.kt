@@ -142,6 +142,12 @@ object AccessibilitySessionSpecProvider {
     fun current(): AccessibilitySessionSpec? = spec
 
     fun arm(value: AccessibilitySessionSpec) {
+        require(
+            value.profile.profileId == value.binding.profileId &&
+                value.profile.packageName == value.binding.packageName
+        ) {
+            "accessibility profile and conversation binding do not match"
+        }
         spec = value
     }
 
