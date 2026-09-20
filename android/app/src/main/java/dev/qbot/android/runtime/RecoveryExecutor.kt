@@ -136,11 +136,18 @@ class RecoveryExecutor(
 
         val sent = sender.send(outboxId)
         return when (sent.status) {
-            "SENT" -> RecoveryExecution(
-                item = item,
-                outcome = RecoveryOutcome.SENT,
-                detail = "durable PENDING effect sent once",
-            )
+            "SENT" -> {
+                val finalized = finalizeRunIfEffectsTerminal(item.runId)
+                RecoveryExecution(
+                    item = item,
+                    outcome = RecoveryOutcome.SENT,
+                    detail = if (finalized) {
+                        "durable PENDING effect sent once; AgentRun finalized locally"
+                    } else {
+                        "durable PENDING effect sent once"
+                    },
+                )
+            }
 
             "SENDING_UNKNOWN" -> RecoveryExecution(
                 item = item,
@@ -162,10 +169,15 @@ class RecoveryExecutor(
         val outboxId = requireNotNull(item.outboxId)
         val reconciled = sender.reconcile(outboxId)
         return if (reconciled.status == "SENT") {
+            val finalized = finalizeRunIfEffectsTerminal(item.runId)
             RecoveryExecution(
                 item = item,
                 outcome = RecoveryOutcome.RECONCILED,
-                detail = "unknown delivery reconciled without resend",
+                detail = if (finalized) {
+                    "unknown delivery reconciled without resend; AgentRun finalized locally"
+                } else {
+                    "unknown delivery reconciled without resend"
+                },
             )
         } else {
             RecoveryExecution(
@@ -174,6 +186,28 @@ class RecoveryExecutor(
                 detail = "delivery remains unresolved",
             )
         }
+    }
+
+    private suspend fun finalizeRunIfEffectsTerminal(
+        runId: String,
+    ): Boolean {
+        val run = runs.load(runId) ?: return false
+        if (run.status != "EXECUTING") {
+            return false
+        }
+
+        val effects = outbox.listForRun(runId)
+        if (
+            effects.isEmpty() ||
+            effects.any {
+                it.status != "SENT" && it.status != "CANCELLED"
+            }
+        ) {
+            return false
+        }
+
+        runs.transition(runId, "SUCCEEDED")
+        return true
     }
 
     private suspend fun executeFinalize(
