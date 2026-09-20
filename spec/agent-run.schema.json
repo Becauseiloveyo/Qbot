@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbot.local/spec/agent-run.schema.json",
+  "title": "Qbot Agent Run",
+  "type": "object",
+  "required": ["schema_version", "run_id", "conversation_id", "trigger_event_id", "status", "steps", "created_at", "updated_at"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "trigger_event_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": ["string", "null"] },
+    "status": {
+      "type": "string",
+      "enum": ["CREATED", "RESTORING", "REASONING", "WAITING_USER", "EXECUTING", "SUCCEEDED", "FAILED", "CANCELLED"]
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["run_step_id", "kind", "status"],
+        "properties": {
+          "run_step_id": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["RESTORE", "DECIDE", "PLAN", "POLICY", "EXECUTE", "CHECKPOINT", "OUTBOX", "RECONCILE", "MEMORY"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED", "WAITING_USER", "CANCELLED"]
+          },
+          "attempt": { "type": "integer", "minimum": 0, "default": 0 },
+          "input_ref": { "type": ["string", "null"] },
+          "output_ref": { "type": ["string", "null"] },
+          "error": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "model_profile": { "type": ["string", "null"] },
+    "writer_epoch": { "type": "integer", "minimum": 0, "default": 0 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
