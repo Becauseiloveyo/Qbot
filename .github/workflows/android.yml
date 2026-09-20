@@ -30,7 +30,7 @@ jobs:
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-37" "build-tools;36.0.0" --channel=3
+          "$SDKMANAGER" "platform-tools" "platforms;android-37.0" "build-tools;36.0.0" --channel=3
 
       - uses: gradle/actions/setup-gradle@v4
         with:
