@@ -34,6 +34,20 @@ data class OutgoingMessage(
     val replyToMessageId: String? = null,
 )
 
+enum class SendAvailability {
+    READY,
+    TEMPORARILY_UNAVAILABLE,
+    UNSUPPORTED,
+}
+
+data class SendReadiness(
+    val availability: SendAvailability,
+    val reason: String? = null,
+) {
+    val ready: Boolean
+        get() = availability == SendAvailability.READY
+}
+
 data class SendResult(
     val accepted: Boolean,
     val platformMessageId: String? = null,
@@ -54,6 +68,18 @@ interface QQTransport {
     suspend fun stop()
     suspend fun receive(): IncomingTransportEvent
     suspend fun send(message: OutgoingMessage): SendResult
+
+    suspend fun checkSendReadiness(
+        message: OutgoingMessage,
+    ): SendReadiness =
+        if (TransportCapability.SEND_TEXT in capabilities) {
+            SendReadiness(SendAvailability.READY)
+        } else {
+            SendReadiness(
+                SendAvailability.UNSUPPORTED,
+                "transport does not support text sends",
+            )
+        }
 
     suspend fun lookupDelivery(
         accountId: String,
