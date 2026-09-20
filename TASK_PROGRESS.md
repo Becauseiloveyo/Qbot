@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.1 — Spec + durable core model
+Current milestone: v0.2 — Desktop Transport + Runtime Skeleton
 Current branch: `feature/android-agent-persistence`
 
 ## Current objective
 
-Finish the common contracts and conformance rules that both Android and Desktop implementations must follow before either runtime diverges.
+Build the first Desktop runtime skeleton on top of the now-stable v0.1 contracts: package layout, SQLite WAL bootstrap, configuration, transport abstraction, and MockTransport.
 
 ## Completed
 
@@ -54,11 +54,14 @@ Finish the common contracts and conformance rules that both Android and Desktop 
 - Added conformance fixtures for duplicate inbound events, duplicate Outbox dedupe keys, stale writer epochs, stale Task versions, and journal ordering.
 - Validator expanded to check those idempotency, fencing, versioning, checkpoint, and journal invariants.
 - Draft PR #1 opened as the v0.1 validation/review surface.
+- PR #1 Conformance workflow run #12 completed successfully; schema + invariant validator passed.
+- v0.1 common contracts are stable enough for runtime implementation.
 
 ## In progress
 
-- Run the expanded conformance suite through GitHub Actions and fix any failures.
-- Tighten any remaining cross-schema invariants exposed by CI.
+- Start Desktop v0.2 runtime skeleton.
+- Add SQLite WAL bootstrap and equivalent persistence primitives.
+- Add QQTransport abstraction and MockTransport before NapCat/OneBot.
 
 ## Not started
 
@@ -97,10 +100,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Confirm PR #1 GitHub Actions conformance result and fix any failures.
-2. If CI passes, mark v0.1 contracts stable for implementation.
-3. Begin Desktop v0.2 runtime skeleton: package layout, SQLite WAL bootstrap, configuration, and MockTransport.
-4. Add NapCat/OneBot transport only after the Desktop core can pass the shared conformance contracts.
+1. Create Desktop v0.2 implementation branch from the v0.1 contract head.
+2. Add Python package layout and configuration model.
+3. Add SQLite WAL bootstrap + metadata table + transaction helpers.
+4. Add QQTransport protocol and MockTransport.
+5. Add tests for WAL/foreign-key setup and MockTransport behavior.
+6. Add NapCat/OneBot only after the Desktop skeleton passes its tests.
 
 ## Resume rule
 
