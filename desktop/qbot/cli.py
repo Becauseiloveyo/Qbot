@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -11,17 +12,21 @@ from qbot.app import DesktopRuntime, build_runtime
 from qbot.config import QbotConfig
 from qbot.llm import LlmDecisionEngine, ModelRole
 from qbot.llm.env_config import build_router_from_environment
-from qbot.logging import configure_logging
+from qbot.logging import configure_logging, log_event
 from qbot.persistence import Database
 from qbot.persistence.journal import JournalRepository
 from qbot.persona import Persona
 from qbot.runtime.context_source import DurableSqliteContextSource
 from qbot.runtime.llm_decision import ContextualLlmDecisionEngine
+from qbot.runtime.recovery_executor import RecoveryMode
 from qbot.transport import MockTransport
 from qbot.transport.onebot import (
     OneBotForwardWsTransport,
     OneBotTransportConfig,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 _ASSIST_SYSTEM_POLICY = """You are the decision layer for Qbot.
@@ -145,7 +150,39 @@ async def _run(args: argparse.Namespace) -> int:
     if args.agent_mode == "assist":
         _configure_assist(runtime)
 
-    await runtime.start()
+    report = await runtime.start(
+        recovery_mode=RecoveryMode(args.agent_mode)
+    )
+    log_event(
+        logger,
+        "startup_recovery",
+        mode=report.mode.value,
+        planned=len(report.plan.items),
+        executed=sum(
+            1
+            for item in report.executions
+            if item.outcome not in {"REPORTED", "DEFERRED", "SKIPPED"}
+        ),
+        deferred=sum(
+            1
+            for item in report.executions
+            if item.outcome in {"REPORTED", "DEFERRED", "SKIPPED"}
+        ),
+        interrupted_sends_reclassified=len(
+            report.plan.interrupted_sends_reclassified
+        ),
+    )
+    for execution in report.executions:
+        log_event(
+            logger,
+            "startup_recovery_item",
+            action=execution.item.action.value,
+            run_id=execution.item.run_id,
+            outbox_id=execution.item.outbox_id,
+            outcome=execution.outcome,
+            detail=execution.detail,
+        )
+
     try:
         while True:
             if args.agent_mode == "observe":
