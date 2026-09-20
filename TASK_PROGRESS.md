@@ -3,7 +3,7 @@
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
 Current milestone: v0.5 — Android Standard Runtime
-Current branch: `feature/desktop-v0.4-recovery-policy`
+Current branch: `feature/android-v0.5-standard-runtime`
 
 ## Current objective
 
@@ -140,15 +140,30 @@ Build the first Android standard runtime that mirrors the frozen durable contrac
 - Conformance #226 / Desktop Tests #200 passed for startup RecoveryExecutor integration; Conformance #241 / Desktop Tests #215 passed for backup/migration/Safe Mode; Conformance #243 / Desktop Tests #217 passed for crash-injection recovery.
 - v0.4 roadmap deliverables are complete.
 
+- Android v0.5 Gradle/Compose project created on `feature/android-v0.5-standard-runtime` with AGP 9.4.0, Gradle 9.6, API 37, Room 2.8.5, WorkManager, DataStore, Coroutines, and KSP 2.3.10.
+- Android CI installs the Android 17 `platforms;android-37.0` preview SDK package; Robolectric 4.17 tests run on Java 21 with the required module `--add-opens`, while application source/bytecode compatibility remains Java 17.
+- Added Room schema v1 mappings for metadata, inbound events, AgentRuns, Tasks/TaskSteps/Checkpoints, Outbox, Journal, Persona, and ContactProfile with equivalent uniqueness/version/fencing fields to Desktop.
+- Android Room migration registry is explicit from schema v1 and does not enable destructive fallback.
+- Added platform-neutral Android `QQTransport` plus deterministic `FakeTransport` with dedupe-key delivery lookup and simulated acknowledgement loss after remote delivery.
+- Added deterministic Android EventNormalizer, per-account/conversation coroutine serialization, and atomic Room inbound admission transaction: fingerprint dedupe + MESSAGE_RECEIVED + one primary AgentRun + RUN_CREATED.
+- `AndroidCore` now transitions a new AgentRun to RESTORING and reloads the trigger event, active Task, and checkpoint matching the current Task version before further processing.
+- Added validated Android AgentRun state machine with conditional transitions and non-terminal run enumeration for restart recovery.
+- Added transactional Android Outbox state machine with `(account_id, dedupe_key)` idempotency, guarded transitions, SEND_UNKNOWN/MESSAGE_SENT journal entries, and crash-left SENDING -> SENDING_UNKNOWN recovery.
+- Added Android RecoveryPlanner matching Desktop safety semantics: PENDING may be a safe send candidate; SENDING_UNKNOWN reconciles only with DELIVERY_LOOKUP, otherwise MANUAL_REVIEW; SENT+EXECUTING plans local finalization; blind unknown replay is forbidden.
+- Added Android SendExecutor; ambiguous delivered sends reconcile through FakeTransport lookup without incrementing the transport attempt count a second time.
+- Added Robolectric/real Room file-database tests for duplicate inbound admission, close/reopen durability, Task/Checkpoint version restore, AgentRun state-machine persistence, Outbox recovery classification, and ambiguous send reconciliation.
+- Android Tests #53, Desktop Tests #290, and Conformance #316 all passed after the durable Room/Outbox/recovery test suite and Robolectric Java 21 fixes.
+- Draft PR #5 is the Android v0.5 validation surface.
+
 ## In progress
 
-- Create the Android v0.5 implementation branch and Gradle/Kotlin project skeleton.
-- Map the core Task/Checkpoint/AgentRun/Outbox/Event contracts into Room entities and DAOs.
+- Add the standard Android QQ transport boundary using NotificationListenerService for inbound notifications and live RemoteInput reply actions where available.
+- Wire Android startup/process-death recovery execution around the tested RecoveryPlan without blindly replaying unknown sends.
 
 ## Not started
 
-- Android application skeleton.
-- Android QQ transport adapters.
+- Standard NotificationListener/RemoteInput QQ transport implementation.
+- Android local configuration and notification-access UI.
 - Persona/contact UI.
 - Memory retrieval implementation.
 - Coordinator and phone/PC synchronization.
@@ -179,13 +194,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create `feature/android-v0.5-standard-runtime` from the tested v0.4 head.
-2. Add Android Gradle project using Kotlin, Jetpack Compose, Room, Coroutines/Flow, WorkManager, and DataStore without coupling Agent Core to QQ-specific APIs.
-3. Add Room entities/DAOs for inbound event, AgentRun, Task/TaskStep/Checkpoint, Outbox, Persona/ContactProfile, Journal, and metadata with the same uniqueness/version invariants as Desktop.
-4. Add Room migrations from the first schema onward; destructive migration fallback is forbidden.
-5. Add platform-neutral Android `QQTransport` capability interface and deterministic FakeTransport for tests.
-6. Add recoverable Android event pipeline: normalize -> dedupe -> per-conversation serialization -> AgentRun -> restore durable state.
-7. Add standard NotificationListener adapter boundary only after the durable fake end-to-end path passes tests.
+1. Add a standard Android notification transport adapter for QQ/TIM using NotificationListenerService as inbound observation; keep Agent Core independent from Android notification APIs.
+2. Extract stable-enough conversation identity with explicit identity-quality metadata; do not pretend notification titles are canonical QQ user IDs.
+3. Support text replies only through a currently live notification RemoteInput/PendingIntent action; if no live action exists, reject the send rather than invent another transport.
+4. Do not advertise DELIVERY_LOOKUP for the notification transport; ambiguous sends must remain SENDING_UNKNOWN/MANUAL_REVIEW.
+5. Add notification-access/configuration UI and transport health/capability reporting.
+6. Wire startup RecoveryPlan handling through WorkManager/event-driven recovery and test process death around a live/expired reply action.
+7. Complete v0.5 exit review before enhanced Accessibility/Shizuku work in v0.6.
 
 ## Resume rule
 
