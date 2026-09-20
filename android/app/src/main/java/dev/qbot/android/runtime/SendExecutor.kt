@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 class SendExecutor(
     private val outbox: OutboxRepository,
     private val transport: QQTransport,
+    private val attemptTransportId: String = transport.name,
 ) {
     suspend fun send(outboxId: String): OutboxMessageEntity {
         val record = outbox.load(outboxId)
@@ -21,7 +22,7 @@ class SendExecutor(
             outboxId = outboxId,
             targetStatus = "SENDING",
             incrementAttempt = true,
-            attemptTransportId = transport.name,
+            attemptTransportId = attemptTransportId,
         )
         val message = OutgoingMessage(
             accountId = sending.accountId,
