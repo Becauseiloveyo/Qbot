@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import dev.qbot.android.transport.IncomingTransportEvent
@@ -226,8 +227,9 @@ class NotificationQQTransport(
                     return@mapNotNull null
                 }
                 Triple(
-                    action.semanticAction ==
-                        Notification.Action.SEMANTIC_ACTION_REPLY,
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                        action.semanticAction ==
+                            Notification.Action.SEMANTIC_ACTION_REPLY,
                     freeFormInputs,
                     pendingIntent,
                 )
