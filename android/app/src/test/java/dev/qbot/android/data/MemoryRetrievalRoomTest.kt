@@ -1,0 +1,382 @@
+package dev.qbot.android.data
+
+import android.app.Application
+import android.content.Context
+import androidx.room.Room
+import dev.qbot.android.data.db.QbotDatabase
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [37], application = Application::class)
+class MemoryRetrievalRoomTest {
+    private lateinit var context: Context
+    private lateinit var database: QbotDatabase
+    private lateinit var memory: MemoryRepository
+    private lateinit var retriever: MemoryRetriever
+
+    private val now = Instant.parse("2026-09-20T16:30:00Z")
+
+    @Before
+    fun setUp() {
+        context = RuntimeEnvironment.getApplication()
+        database = Room.inMemoryDatabaseBuilder(
+            context,
+            QbotDatabase::class.java,
+        )
+            .allowMainThreadQueries()
+            .build()
+        memory = MemoryRepository(
+            database = database,
+            clock = Clock.fixed(
+                Instant.parse("2026-09-20T16:00:00Z"),
+                ZoneOffset.UTC,
+            ),
+        )
+        retriever = MemoryRetriever(database)
+    }
+
+    @After
+    fun tearDown() {
+        database.close()
+    }
+
+    @Test
+    fun onlyPromotedCurrentDomainRecordsAreEligible() = runBlocking {
+        val promoted = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-1",
+            content = "project deadline is Friday",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-promoted",
+            validFrom = "2026-09-20T12:00:00Z",
+        )
+        memory.createCandidate(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-1",
+            content = "project deadline candidate",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-candidate",
+        )
+        val rejected = memory.createCandidate(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-1",
+            content = "project deadline rejected",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-rejected",
+        )
+        memory.reject(rejected.memoryId)
+        promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-2",
+            content = "project deadline other conversation",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-other",
+        )
+
+        val old = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-1",
+            content = "project deadline was Monday",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-old",
+        )
+        val replacement = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-1",
+            content = "project deadline is now Tuesday",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-new",
+            supersedes = old.memoryId,
+        )
+
+        val hits = retriever.retrieve(
+            MemoryQuery(
+                scopes = listOf("CONVERSATION_MEMORY"),
+                conversationId = "conv-1",
+                text = "project deadline",
+                limit = 10,
+            ),
+            now = now,
+        )
+
+        val ids = hits.map { it.record.memoryId }
+        assertTrue(promoted.memoryId in ids)
+        assertTrue(replacement.memoryId in ids)
+        assertTrue(old.memoryId !in ids)
+        assertEquals(2, ids.size)
+        assertTrue(hits.all { it.record.state == "PROMOTED" })
+    }
+
+    @Test
+    fun scoringIsDeterministicAndExposesComponents() = runBlocking {
+        val recent = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-score",
+            content = "tea meeting moved to eight",
+            entities = listOf("tea", "meeting"),
+            sourceType = "USER_SELF",
+            trust = 0.8,
+            importance = 0.6,
+            sourceEventId = "evt-recent",
+            validFrom = "2026-09-20T12:00:00Z",
+        )
+        val older = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-score",
+            content = "tea meeting notes",
+            entities = listOf("tea"),
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            importance = 1.0,
+            sourceEventId = "evt-older",
+            validFrom = "2025-09-01T00:00:00Z",
+        )
+
+        val query = MemoryQuery(
+            scopes = listOf("CONVERSATION_MEMORY"),
+            conversationId = "conv-score",
+            text = "tea meeting",
+            entities = listOf("meeting"),
+        )
+        val first = retriever.retrieve(query, now)
+        val second = retriever.retrieve(query, now)
+
+        assertEquals(
+            first.map { it.record.memoryId },
+            second.map { it.record.memoryId },
+        )
+        assertEquals(recent.memoryId, first.first().record.memoryId)
+        assertEquals(1000, first.first().score.keywordMilli)
+        assertEquals(1000, first.first().score.entityMilli)
+        assertEquals(1000, first.first().score.recencyMilli)
+        assertEquals(600, first.first().score.importanceMilli)
+        assertEquals(800, first.first().score.trustMilli)
+
+        val olderScore = first
+            .first { it.record.memoryId == older.memoryId }
+            .score
+            .totalPoints
+        assertTrue(first.first().score.totalPoints > olderScore)
+    }
+
+    @Test
+    fun ownerScopeIsolationIsStrict() = runBlocking {
+        val wanted = promote(
+            scope = "CONTACT_PROFILE",
+            ownerId = "contact-1",
+            content = "likes green tea",
+            entities = listOf("tea"),
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-contact-1",
+        )
+        promote(
+            scope = "CONTACT_PROFILE",
+            ownerId = "contact-2",
+            content = "likes green tea",
+            entities = listOf("tea"),
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-contact-2",
+        )
+
+        val hits = retriever.retrieve(
+            MemoryQuery(
+                scopes = listOf("CONTACT_PROFILE"),
+                ownerId = "contact-1",
+                text = "tea",
+            ),
+            now = now,
+        )
+
+        assertEquals(
+            listOf(wanted.memoryId),
+            hits.map { it.record.memoryId },
+        )
+    }
+
+    @Test
+    fun temporalValidityAndRelevanceFailClosed() = runBlocking {
+        val live = promote(
+            scope = "TASK_MEMORY",
+            taskId = "task-1",
+            content = "deploy after tests pass",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-live",
+            validFrom = "2026-09-20T10:00:00Z",
+            validTo = "2026-09-21T10:00:00Z",
+        )
+        promote(
+            scope = "TASK_MEMORY",
+            taskId = "task-1",
+            content = "deploy future plan",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-future",
+            validFrom = "2026-09-21T10:00:00Z",
+        )
+        promote(
+            scope = "TASK_MEMORY",
+            taskId = "task-1",
+            content = "deploy expired plan",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-expired",
+            validTo = "2026-09-19T10:00:00Z",
+        )
+        promote(
+            scope = "TASK_MEMORY",
+            taskId = "task-1",
+            content = "unrelated shopping preference",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-unrelated",
+        )
+
+        val hits = retriever.retrieve(
+            MemoryQuery(
+                scopes = listOf("TASK_MEMORY"),
+                taskId = "task-1",
+                text = "deploy",
+            ),
+            now = now,
+        )
+
+        assertEquals(
+            listOf(live.memoryId),
+            hits.map { it.record.memoryId },
+        )
+    }
+
+    @Test
+    fun explicitDomainIdentifiersAndLimitsAreRequired() = runBlocking {
+        expectRetrievalError {
+            retriever.retrieve(
+                MemoryQuery(
+                    scopes = listOf("CONVERSATION_MEMORY"),
+                    text = "x",
+                ),
+                now = now,
+            )
+        }
+        expectRetrievalError {
+            retriever.retrieve(
+                MemoryQuery(
+                    scopes = listOf("CONTACT_PROFILE"),
+                    text = "x",
+                ),
+                now = now,
+            )
+        }
+        expectRetrievalError {
+            retriever.retrieve(
+                MemoryQuery(
+                    scopes = listOf("SYSTEM_POLICY"),
+                    limit = 0,
+                ),
+                now = now,
+            )
+        }
+    }
+
+    @Test
+    fun minimumTrustAndStableLimitAreRepeatable() = runBlocking {
+        repeat(3) { index ->
+            promote(
+                scope = "CONVERSATION_MEMORY",
+                conversationId = "conv-limit",
+                content = "same keyword record $index",
+                sourceType = "USER_SELF",
+                trust = if (index == 0) 0.2 else 0.8,
+                importance = 0.5,
+                sourceEventId = "evt-limit-$index",
+                validFrom = "2026-09-20T12:00:00Z",
+            )
+        }
+
+        val query = MemoryQuery(
+            scopes = listOf("CONVERSATION_MEMORY"),
+            conversationId = "conv-limit",
+            text = "same keyword",
+            minTrust = 0.5,
+            limit = 2,
+        )
+        val first = retriever.retrieve(query, now)
+        val second = retriever.retrieve(query, now)
+
+        assertEquals(2, first.size)
+        assertEquals(
+            first.map { it.record.memoryId },
+            second.map { it.record.memoryId },
+        )
+        assertTrue(first.all { it.record.trust >= 0.5 })
+    }
+
+    private suspend fun promote(
+        scope: String,
+        content: String,
+        sourceType: String,
+        trust: Double,
+        ownerId: String? = null,
+        conversationId: String? = null,
+        taskId: String? = null,
+        entities: List<String> = emptyList(),
+        importance: Double? = null,
+        confidence: Double? = null,
+        sourceMessageId: String? = null,
+        sourceEventId: String? = null,
+        validFrom: String? = null,
+        validTo: String? = null,
+        supersedes: String? = null,
+    ): MemoryRecord =
+        memory.promote(
+            memory.createCandidate(
+                scope = scope,
+                content = content,
+                sourceType = sourceType,
+                trust = trust,
+                ownerId = ownerId,
+                conversationId = conversationId,
+                taskId = taskId,
+                entities = entities,
+                importance = importance,
+                confidence = confidence,
+                sourceMessageId = sourceMessageId,
+                sourceEventId = sourceEventId,
+                validFrom = validFrom,
+                validTo = validTo,
+                supersedes = supersedes,
+            ).memoryId,
+        )
+
+    private suspend fun expectRetrievalError(
+        block: suspend () -> Unit,
+    ) {
+        try {
+            block()
+            fail("expected MemoryRetrievalError")
+        } catch (_: MemoryRetrievalError) {
+            // Expected.
+        }
+    }
+}
