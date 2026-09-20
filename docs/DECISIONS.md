@@ -98,3 +98,10 @@ Reason: schema drift or a failed migration must never be hidden by `create_all` 
 Decision: when database bootstrap enters Safe Mode, Desktop Runtime does not start QQ transport and does not execute startup recovery. Read-only journal/diagnostic operations and consistent database snapshot export remain available.
 
 Reason: inspection and recovery must remain possible without allowing task execution or external side effects against an untrusted database state.
+
+
+## ADR-017 — Android standard runtime mirrors durable contracts in Room
+
+Decision: Android v0.5 uses native Kotlin/Room implementations of the common Event, AgentRun, Task/Checkpoint, Outbox, Persona/ContactProfile, and Journal contracts. Inbound admission, Outbox creation/transitions, and recovery classification remain transactional/deterministic; Android does not share the Desktop Python runtime.
+
+Reason: cross-platform correctness depends on invariant equivalence, not code reuse. Android lifecycle/process death requires platform-native persistence while preserving the same idempotency and uncertainty semantics.
