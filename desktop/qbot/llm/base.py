@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from qbot.prompt import PromptMessage
+
 
 class ModelRole(StrEnum):
     DECISION = "decision"
@@ -14,11 +16,7 @@ class ModelRole(StrEnum):
     MEMORY = "memory"
 
 
-class LlmMessage(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    role: str = Field(pattern="^(system|user|assistant)$")
-    content: str
+LlmMessage = PromptMessage
 
 
 class LlmRequest(BaseModel):
