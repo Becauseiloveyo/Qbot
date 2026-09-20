@@ -120,6 +120,18 @@ class OutboxRepository:
             ) from exc
         return self.load(outbox_id)
 
+    def list_for_run(self, run_id: str) -> list[OutboxRecord]:
+        with self.database.engine.connect() as conn:
+            rows = conn.execute(
+                select(outbox_messages)
+                .where(outbox_messages.c.run_id == run_id)
+                .order_by(
+                    outbox_messages.c.created_at.asc(),
+                    outbox_messages.c.outbox_id.asc(),
+                )
+            ).mappings().all()
+        return [OutboxRecord(**dict(row)) for row in rows]
+
     def list_by_status(
         self,
         statuses: tuple[str, ...] | list[str] | set[str],
