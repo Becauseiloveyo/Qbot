@@ -9,12 +9,16 @@ from qbot.domain.actions import (
 
 
 class BasicActionPolicy:
-    """Minimal deterministic R0-R3 gate.
-
-    This is intentionally conservative and independent of model instructions.
-    """
+    """Minimal deterministic R0-R3 gate independent of model instructions."""
 
     def evaluate(self, proposal: ActionProposal) -> PolicyDecision:
+        if proposal.action == "REQUEST_HUMAN":
+            return PolicyDecision(
+                risk_class=RiskClass.R2,
+                outcome=PolicyOutcome.REQUIRE_HUMAN,
+                reasons=("proposal explicitly requested human review",),
+            )
+
         mapping = {
             RiskClass.R0: PolicyOutcome.ALLOW,
             RiskClass.R1: PolicyOutcome.ALLOW_AUDIT,
