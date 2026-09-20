@@ -26,6 +26,34 @@ class InboundAdmissionRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
 
+    def load_event(self, event_id: str) -> NormalizedEvent:
+        with self.database.engine.connect() as conn:
+            row = conn.execute(
+                select(inbound_events).where(inbound_events.c.event_id == event_id)
+            ).mappings().one_or_none()
+        if row is None:
+            raise KeyError(f"unknown inbound event: {event_id}")
+        return NormalizedEvent(
+            schema_version=row["schema_version"],
+            event_id=row["event_id"],
+            fingerprint=row["fingerprint"],
+            platform=row["platform"],
+            transport=row["transport"],
+            account_id=row["account_id"],
+            conversation_id=row["conversation_id"],
+            sender_id=row["sender_id"],
+            platform_message_id=row["platform_message_id"],
+            event_type=row["event_type"],
+            message_type=row["message_type"],
+            text=row["text"],
+            content_ref=row["content_ref"],
+            reply_to_message_id=row["reply_to_message_id"],
+            occurred_at=row["occurred_at"],
+            received_at=row["received_at"],
+            raw_ref=row["raw_ref"],
+            metadata=json.loads(row["metadata_json"]),
+        )
+
     def admit(self, event: NormalizedEvent) -> AdmissionResult:
         with self.database.transaction() as conn:
             insert_event = (
