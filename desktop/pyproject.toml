@@ -16,3 +16,7 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["qbot*"]
+
+
+[project.scripts]
+qbot-desktop = "qbot.cli:main"
