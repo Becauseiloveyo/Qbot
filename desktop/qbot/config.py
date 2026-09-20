@@ -18,4 +18,4 @@ class QbotConfig(BaseModel):
     node_id: str = Field(default="desktop-local", min_length=1)
     database_path: Path = Path("./data/qbot.db")
     spec_version: str = "0.1.0"
-    db_schema_version: str = "2"
+    db_schema_version: str = "3"
