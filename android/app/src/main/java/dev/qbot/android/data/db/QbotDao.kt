@@ -42,6 +42,15 @@ interface QbotDao {
 
     @Query(
         """
+        SELECT * FROM agent_runs
+        WHERE status IN (:statuses)
+        ORDER BY created_at, run_id
+        """,
+    )
+    suspend fun agentRunsByStatus(statuses: List<String>): List<AgentRunEntity>
+
+    @Query(
+        """
         UPDATE agent_runs
         SET status = :targetStatus, updated_at = :updatedAt
         WHERE run_id = :runId AND status = :expectedStatus
