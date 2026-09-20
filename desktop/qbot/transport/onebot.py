@@ -301,6 +301,10 @@ class OneBotForwardWsTransport(QQTransport):
                 event = OneBotCodec.event_from_payload(payload)
                 if event is not None:
                     await self._incoming.put(event)
+
+            closed = RuntimeError("OneBot connection closed")
+            self._reader_error = closed
+            self._fail_pending(closed)
         except asyncio.CancelledError:
             raise
         except BaseException as exc:
