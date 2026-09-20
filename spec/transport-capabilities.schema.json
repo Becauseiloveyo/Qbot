@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbot.local/spec/transport-capabilities.schema.json",
+  "title": "Qbot Transport Capabilities",
+  "type": "object",
+  "required": ["schema_version", "transport_id", "capabilities"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "transport_id": { "type": "string", "minLength": 1 },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "READ_TEXT",
+          "SEND_TEXT",
+          "SEND_IMAGE",
+          "READ_HISTORY",
+          "QUOTE_REPLY",
+          "GROUP_MESSAGE",
+          "SEND_FILE",
+          "REACTION",
+          "RECALL",
+          "DELIVERY_LOOKUP"
+        ]
+      }
+    },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}
