@@ -68,7 +68,7 @@ class LlmDecisionEngineTests(unittest.IsolatedAsyncioTestCase):
         )
         engine = LlmDecisionEngine(
             router=router,
-            max_input_tokens=220,
+            max_input_tokens=320,
         )
         result = await engine.decide(
             run_id="run-1",
