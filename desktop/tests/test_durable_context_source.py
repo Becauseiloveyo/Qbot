@@ -10,7 +10,8 @@ from qbot.config import QbotConfig
 from qbot.domain.events import NormalizedEvent
 from qbot.llm import MockLlmProvider, ModelRole, ModelRouter
 from qbot.llm.decision import LlmDecisionEngine
-from qbot.persona import Persona
+from qbot.persona import ContactProfile, Persona
+from qbot.persistence.persona_store import PersonaStore
 from qbot.persistence import Database
 from qbot.persistence.tables import task_checkpoints, task_steps, tasks
 from qbot.runtime.context_source import DurableSqliteContextSource
@@ -28,6 +29,31 @@ class DurableContextSourceTests(unittest.IsolatedAsyncioTestCase):
             QbotConfig(database_path=Path(self.tmp.name) / "qbot.db")
         )
         self.db.bootstrap()
+        store = PersonaStore(self.db)
+        store.upsert_persona(
+            Persona(
+                persona_id="default",
+                identity_summary="默认语气",
+                style_rules=("简短",),
+            ),
+            set_default=True,
+        )
+        store.upsert_persona(
+            Persona(
+                persona_id="classmate",
+                identity_summary="同学语气",
+                style_rules=("自然一点",),
+            )
+        )
+        store.upsert_contact(
+            ContactProfile(
+                contact_id="contact-1",
+                relation="classmate",
+                stable_facts=("同班同学",),
+                style_overrides=("少用标点",),
+            ),
+            persona_id="classmate",
+        )
 
         stamp = now()
         with self.db.transaction() as conn:
@@ -137,6 +163,8 @@ class DurableContextSourceTests(unittest.IsolatedAsyncioTestCase):
 
         await adapter.decide(run_id="run-1", event=self._event())
         self.assertIn("架构图还没有改完", seen[0])
+        self.assertIn("同学语气", seen[0])
+        self.assertIn("relation: classmate", seen[0])
 
         later = "2026-09-20T00:10:00Z"
         with self.db.transaction() as conn:
@@ -178,11 +206,32 @@ class DurableContextSourceTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
 
+        store = PersonaStore(self.db)
+        store.upsert_persona(
+            Persona(
+                persona_id="classmate",
+                identity_summary="同学语气 v2",
+                style_rules=("更简短",),
+            )
+        )
+        store.upsert_contact(
+            ContactProfile(
+                contact_id="contact-1",
+                relation="project-teammate",
+                stable_facts=("现在一起做项目",),
+                style_overrides=("直接一点",),
+            ),
+            persona_id="classmate",
+        )
+
         await adapter.decide(run_id="run-1", event=self._event())
         self.assertEqual(len(seen), 2)
         self.assertIn("架构图已经修改完成，正在检查", seen[1])
         self.assertIn("version: 2", seen[1])
+        self.assertIn("同学语气 v2", seen[1])
+        self.assertIn("relation: project-teammate", seen[1])
         self.assertNotIn("架构图还没有改完", seen[1])
+        self.assertNotIn("同学语气\n", seen[1])
 
 
 if __name__ == "__main__":
