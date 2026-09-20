@@ -9,7 +9,7 @@ from qbot.persistence.outbox import OutboxRecord, OutboxRepository
 from qbot.persistence.runs import AgentRunRepository
 from qbot.transport import QQTransport
 
-from .decision import MockDecisionEngine
+from .decision import DecisionEngine, MockDecisionEngine
 from .policy import BasicActionPolicy
 from .send import SendExecutor
 
@@ -32,7 +32,7 @@ class DurableReplyFlow:
         outbox: OutboxRepository,
         journal: JournalRepository,
         transport: QQTransport,
-        decision: MockDecisionEngine | None = None,
+        decision: DecisionEngine | None = None,
         policy: BasicActionPolicy | None = None,
     ) -> None:
         self.admission = admission
@@ -77,7 +77,7 @@ class DurableReplyFlow:
             run = self.runs.transition(run_id, "REASONING")
 
         if run.status == "REASONING":
-            proposal = self.decision.decide(run_id=run_id, event=event)
+            proposal = await self.decision.decide(run_id=run_id, event=event)
             self._validate_proposal(proposal)
 
             self.journal.append(
