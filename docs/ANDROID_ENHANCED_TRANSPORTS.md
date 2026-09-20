@@ -58,3 +58,23 @@ Common adapter health states are READY, DEGRADED, PERMISSION_REQUIRED, STOPPED, 
 ## Experimental/root/hook boundary
 
 LSPosed/root/hook integration remains a separate experimental adapter and is never a prerequisite for Standard or Accessibility operation.
+
+## Durable adapter identity
+
+The adapter selected by routing has a stable `adapterId`. At the `PENDING -> SENDING` boundary Qbot journals `SEND_STARTED` with that adapter ID before calling the external transport. The routing adapter ID, not an implementation class name or incidental transport label, is the recovery identity.
+
+If a send becomes `SENDING_UNKNOWN`, only that recorded adapter may perform delivery lookup. A different adapter being healthy or supporting `DELIVERY_LOOKUP` does not authorize cross-adapter reconciliation or resend.
+
+## Exact Accessibility reply sessions
+
+Accessibility permission alone never grants `SEND_TEXT`. A short-lived reply session requires:
+
+- a versioned, explicitly trusted UI profile;
+- a process-local conversation binding;
+- an exact expected conversation token;
+- exactly one safe editable composer;
+- exactly one safe clickable send action.
+
+The driver re-reads the active window and validates the expected conversation token on every text insertion and every send click. It also revalidates after inserting text and before clicking send. Unknown layouts, ambiguous controls, stale nodes, token mismatches, process death, or service disconnect clear/degrade the session rather than guessing.
+
+No production QQ/TIM view IDs are guessed into the repository. Real profiles remain a device/version calibration item and must be positively verified before arming the enhanced adapter.
