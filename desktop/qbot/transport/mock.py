@@ -20,6 +20,7 @@ class MockTransport(QQTransport):
         self._started = False
         self._send_counter = 0
         self._delivery_by_key: dict[tuple[str, str], str] = {}
+        self._next_send_uncertain_after_delivery = False
 
     @property
     def name(self) -> str:
@@ -50,6 +51,11 @@ class MockTransport(QQTransport):
         self._require_started()
         return await self._incoming.get()
 
+    def make_next_send_uncertain_after_delivery(self) -> None:
+        """Simulate a transport write that succeeds but loses its acknowledgement."""
+
+        self._next_send_uncertain_after_delivery = True
+
     async def send(self, message: OutgoingMessage) -> SendResult:
         self._require_started()
         delivery_key = (message.account_id, message.dedupe_key)
@@ -64,6 +70,16 @@ class MockTransport(QQTransport):
         self._send_counter += 1
         platform_message_id = f"mock-msg-{self._send_counter}"
         self._delivery_by_key[delivery_key] = platform_message_id
+
+        if self._next_send_uncertain_after_delivery:
+            self._next_send_uncertain_after_delivery = False
+            return SendResult(
+                accepted=True,
+                platform_message_id=None,
+                uncertain=True,
+                error="simulated acknowledgement loss after delivery",
+            )
+
         return SendResult(
             accepted=True,
             platform_message_id=platform_message_id,
