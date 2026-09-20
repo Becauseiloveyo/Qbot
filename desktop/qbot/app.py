@@ -6,6 +6,12 @@ from qbot.config import QbotConfig
 from qbot.persistence import Database
 from qbot.runtime import DesktopCore
 from qbot.runtime.decision import DecisionEngine
+from qbot.runtime.recovery import RecoveryPlanner
+from qbot.runtime.recovery_executor import (
+    RecoveryExecutor,
+    RecoveryMode,
+    RecoveryReport,
+)
 from qbot.transport import MockTransport, QQTransport
 
 
@@ -15,10 +21,30 @@ class DesktopRuntime:
     database: Database
     transport: QQTransport
     core: DesktopCore
+    recovery_report: RecoveryReport | None = None
 
-    async def start(self) -> None:
+    async def start(
+        self,
+        recovery_mode: RecoveryMode | str = RecoveryMode.OBSERVE,
+    ) -> RecoveryReport:
         self.database.bootstrap()
         await self.transport.start()
+
+        planner = RecoveryPlanner(
+            runs=self.core.runs,
+            outbox=self.core.outbox,
+            transport=self.transport,
+        )
+        executor = RecoveryExecutor(
+            planner=planner,
+            runs=self.core.runs,
+            outbox=self.core.outbox,
+            journal=self.core.journal,
+            transport=self.transport,
+            reply_flow=self.core.reply_flow,
+        )
+        self.recovery_report = await executor.run(recovery_mode)
+        return self.recovery_report
 
     async def stop(self) -> None:
         await self.transport.stop()
