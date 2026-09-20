@@ -1,0 +1,38 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "recover ambiguous external send without blind replay",
+  "given": {
+    "outbox": {
+      "schema_version": "0.1.0",
+      "outbox_id": "out-17",
+      "run_id": "run-17",
+      "account_id": "acc-1",
+      "conversation_id": "conv-1",
+      "dedupe_key": "run-17:reply-1",
+      "status": "SENDING_UNKNOWN",
+      "payload": {
+        "kind": "TEXT",
+        "text": "我还在整理，弄完跟你说",
+        "content_ref": null,
+        "reply_to_message_id": "msg-002"
+      },
+      "platform_message_id": null,
+      "transport_attempts": 1,
+      "last_error": "process died after transport write",
+      "writer_epoch": 0,
+      "created_at": "2026-09-20T06:00:00Z",
+      "sent_at": null
+    },
+    "transport_capabilities": ["SEND_TEXT", "READ_HISTORY", "DELIVERY_LOOKUP"],
+    "history_match": {
+      "found": true,
+      "platform_message_id": "qq-msg-9001"
+    }
+  },
+  "expect": {
+    "blind_resend": false,
+    "final_outbox_status": "SENT",
+    "record_platform_message_id": "qq-msg-9001",
+    "journal_events": ["RECOVERY_STARTED", "MESSAGE_SENT", "RECOVERY_COMPLETED"]
+  }
+}
