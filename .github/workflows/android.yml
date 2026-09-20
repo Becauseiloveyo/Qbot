@@ -39,3 +39,14 @@ jobs:
       - name: Build and test Android
         working-directory: android
         run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
+
+      - name: Verify Room schema export
+        run: |
+          test -f android/app/schemas/dev.qbot.android.data.db.QbotDatabase/1.json
+
+      - name: Upload Room schema
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbot-room-schema-v1
+          path: android/app/schemas
+          if-no-files-found: error
