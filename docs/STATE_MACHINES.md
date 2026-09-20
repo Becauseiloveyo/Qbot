@@ -90,6 +90,8 @@ FAILED -> PENDING
 FAILED -> CANCELLED
 ```
 
+Every routed `PENDING -> SENDING` transition must atomically append `SEND_STARTED` with the stable selected `transport_id` before the external adapter is invoked. Adapter fallback is allowed only before this transition. After an attempt begins, `SENDING_UNKNOWN` may be reconciled only by the recorded original adapter; cross-adapter lookup or replay is forbidden.
+
 ## Core invariants
 
 - An active Task may have at most one `RUNNING` step in v0.1.
@@ -99,4 +101,5 @@ FAILED -> CANCELLED
 - One inbound event fingerprint is processed at most once locally.
 - One outbox `dedupe_key` is unique per account.
 - `SENDING_UNKNOWN` must be reconciled before automatic retry when platform history/IDs can establish prior delivery.
+- Routed recovery uses the `SEND_STARTED.transport_id` journal record as the authority for which adapter may reconcile an ambiguous effect.
 - An LLM may never bypass these state transitions.
