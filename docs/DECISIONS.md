@@ -59,3 +59,22 @@ Reason: Android background execution constraints make permanent-daemon assumptio
 Decision: SQLite first; no mandatory Redis, PostgreSQL, vector database, Kubernetes, or LangGraph runtime.
 
 Reason: Qbot is initially a single-user personal agent; extra distributed infrastructure would slow iteration without solving current requirements.
+
+
+## ADR-011 — Persona and contact selection are durable state
+
+Decision: Persona records, ContactProfile records, the default Persona selection, and per-contact Persona overrides are stored in Qbot persistence and reloaded before each model decision.
+
+Reason: style/relationship behavior must survive context truncation, model replacement, and process restarts just like Task/Checkpoint state.
+
+## ADR-012 — Real transports default to observe mode
+
+Decision: the Desktop CLI defaults to `--agent-mode observe`. Model-driven replies require explicit `assist` selection and still pass through ActionProposal validation, deterministic Policy, and the durable Outbox.
+
+Reason: connecting a real QQ transport must not implicitly enable autonomous external side effects.
+
+## ADR-013 — LLM credentials are runtime-only
+
+Decision: OpenAI-compatible provider base URL/model routing may come from environment configuration, but API keys remain runtime secrets (`SecretStr`) and are not persisted to the ordinary Qbot database/config.
+
+Reason: provider credentials are not agent memory or application state and should not leak through backups, prompts, journals, or normal configuration exports.
