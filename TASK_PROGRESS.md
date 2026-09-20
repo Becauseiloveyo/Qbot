@@ -170,15 +170,33 @@ Add Android enhanced transport capabilities behind the existing platform-neutral
 - Android Tests #120, Desktop Tests #360, and Conformance #386 passed at the v0.5 exit point; Room schema verify/upload steps also passed.
 - v0.5 roadmap deliverables are complete.
 
+- v0.6 branch `feature/android-v0.6-enhanced-transports` created from the tested v0.5 head; draft PR #6 is the validation surface.
+- Added `AdapterTier`, `AdapterHealth`, capability snapshots, deterministic `TransportSelector`, and `TransportRegistry`.
+- Added `RoutedSendExecutor`: fallback is allowed only while an effect remains PENDING; once one adapter enters SENDING, no second adapter may automatically replay that Outbox effect.
+- Added durable `SEND_STARTED` journaling at the PENDING -> SENDING transaction boundary with the selected stable adapter ID; the common journal schema and conformance fixture now recognize this event.
+- Added routed restart recovery: `SENDING_UNKNOWN` looks up the original `SEND_STARTED.transport_id` and can reconcile only through that adapter; cross-adapter lookup/replay is forbidden.
+- Startup WorkManager recovery now uses the Android transport registry rather than a notification-only recovery path.
+- Added capability-bounded `AccessibilityQQTransport`. It is outbound-only in v0.6 and advertises SEND_TEXT only with a currently valid exact reply session.
+- Added scoped `QbotAccessibilityService` for QQ/TIM with explicit user enablement, health reporting, and fail-closed lifecycle handling.
+- Added versioned Accessibility UI profiles plus process-local conversation bindings. No unverified QQ/TIM view IDs are hard-coded into production.
+- Accessibility sends require an exact conversation token plus exactly one editable composer and one clickable send action. The active window/token is revalidated for each text insertion and each click, including a second validation after text insertion and before the external send action.
+- Accessibility service disconnect resets the enhanced transport to STOPPED and clears the reply session; process death requires trusted re-arming rather than restoring stale UI nodes.
+- Added Shizuku 13.1.5 as an optional system-capability provider. Installation, binder, and permission state are reported separately; READY advertises only SYSTEM_API_BRIDGE and never infers QQ READ_TEXT/SEND_TEXT/DELIVERY_LOOKUP.
+- Shizuku permission is requested only by an explicit local UI action; Qbot remains functional without the Shizuku manager/service.
+- Added an experimental/root/hook provider boundary with no LSPosed/root dependency in the standard Android runtime. Experimental adapters are disabled by default and may be configured only before registry initialization.
+- Added enhanced status UI for Notification, Accessibility, and Shizuku.
+- Added regression tests for pre-send fallback, no fallback after an ambiguous external attempt, stable adapter-ID journaling, original-adapter-only reconciliation, Accessibility exact-addressing/session expiry, conversation changes between text entry and send, Shizuku state/permission mapping, and experimental-provider fail-closed behavior.
+- Android Tests #210 passed on the enhanced transport/routed recovery baseline; Desktop Tests #464 and Conformance #490 passed on the later exact-token code head. Android Tests #216 is the remaining exact-token hardening validation currently pending.
+- Real QQ/TIM Accessibility UI profiles/view IDs are intentionally not guessed. Live profile calibration/verification against an actual device/app version remains an environment validation item, analogous to live NapCat verification in v0.2.
+
 ## In progress
 
-- Review current Android Accessibility/Shizuku capabilities and define the v0.6 enhanced transport contract without weakening the durable Outbox/policy boundary.
-- Add capability negotiation and adapter health/fallback semantics before implementing enhanced QQ operations.
+- Complete Android Tests #216 for the exact-token Accessibility action hardening; if it fails, fix only the reported regression before closing v0.6.
+- Run the v0.6 exit review and then create the v0.7 Hybrid Memory branch from the verified v0.6 head.
 
 ## Not started
 
-- Accessibility/Shizuku enhanced QQ transport implementation.
-- Expert/root/hook adapter implementation.
+- Device-specific verified QQ/TIM Accessibility profile calibration.
 - Persona/contact UI.
 - Memory retrieval implementation.
 - Coordinator and phone/PC synchronization.
@@ -209,13 +227,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create feature/android-v0.6-enhanced-transports from the tested v0.5 head.
-2. Review Android 17 AccessibilityService and Shizuku APIs/constraints and document what each adapter can actually prove/support.
-3. Define enhanced transport capability negotiation, health, and fallback ordering without exposing platform-specific APIs to Agent Core.
-4. Implement an Accessibility adapter only for capabilities that can be identified and tested reliably; keep send side effects behind Outbox + policy.
-5. Add Shizuku as an optional capability provider rather than a mandatory runtime dependency.
-6. Keep expert/root/LSPosed hook integration behind a separate experimental adapter boundary.
-7. Add conformance/regression tests showing fallback never duplicates an Outbox effect across Standard/Enhanced adapters.
+1. Confirm the latest Android exact-token CI result and close any reported v0.6 regression.
+2. Mark v0.6 roadmap deliverables complete once the latest Android, Desktop, and Conformance checks are green.
+3. Create `feature/v0.7-hybrid-memory` from the verified v0.6 head.
+4. Implement candidate-memory staging and provenance/trust persistence first; external/contact text must not directly become trusted persona/system memory.
+5. Add append/supersede memory history and deterministic FTS/entity/temporal/importance retrieval before semantic embeddings.
+6. Add semantic retrieval as a pluggable scorer and keep active Task/Checkpoint outside normal memory retrieval.
+7. Add background memory extraction/summarization only after synchronous durable reply/task state remains independent from indexing.
 
 ## Resume rule
 
