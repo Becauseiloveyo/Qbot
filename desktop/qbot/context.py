@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
-from qbot.llm.base import LlmMessage
+from qbot.prompt import PromptMessage
 from qbot.persona import ContactProfile, Persona
 
 
@@ -30,7 +30,7 @@ class ContextInput(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class ContextBuildResult:
-    messages: tuple[LlmMessage, ...]
+    messages: tuple[PromptMessage, ...]
     estimated_input_tokens: int
     dropped_sections: tuple[str, ...]
 
@@ -125,7 +125,7 @@ class ContextBuilder:
             [stable, durable, *included]
         ).strip()
         messages = (
-            LlmMessage(role="system", content=system_content),
+            PromptMessage(role="system", content=system_content),
             LlmMessage(role="user", content=current),
         )
         estimated = sum(self.estimator.estimate(m.content) for m in messages)
