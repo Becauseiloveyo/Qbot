@@ -7,6 +7,7 @@ import dev.qbot.android.data.db.QbotDatabase
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
+import org.json.JSONObject
 
 class DuplicateOutboxEffect(
     message: String,
@@ -116,6 +117,7 @@ class OutboxRepository(
         platformMessageId: String? = null,
         error: String? = null,
         incrementAttempt: Boolean = false,
+        attemptTransportId: String? = null,
     ): OutboxMessageEntity = database.withTransaction {
         val current = requireNotNull(dao.outbox(outboxId)) {
             "unknown Outbox record: " + outboxId
@@ -143,6 +145,26 @@ class OutboxRepository(
                 "Outbox changed concurrently while transitioning " +
                     outboxId + " from " + current.status +
                     " to " + targetStatus,
+            )
+        }
+
+        if (targetStatus == "SENDING" && attemptTransportId != null) {
+            dao.insertJournal(
+                JournalEntity(
+                    journalId = "journal-" + idFactory(),
+                    schemaVersion = current.schemaVersion,
+                    eventType = "SEND_STARTED",
+                    actor = "TRANSPORT",
+                    accountId = current.accountId,
+                    conversationId = current.conversationId,
+                    taskId = null,
+                    runId = current.runId,
+                    relatedId = outboxId,
+                    payloadJson = JSONObject()
+                        .put("transport_id", attemptTransportId)
+                        .toString(),
+                    occurredAt = now,
+                ),
             )
         }
 
@@ -175,6 +197,21 @@ class OutboxRepository(
         }
 
         requireNotNull(dao.outbox(outboxId))
+    }
+
+    suspend fun lastAttemptTransportId(
+        outboxId: String,
+    ): String? {
+        val record = dao.latestJournalForRelated(
+            relatedId = outboxId,
+            eventType = "SEND_STARTED",
+        ) ?: return null
+
+        return runCatching {
+            JSONObject(record.payloadJson)
+                .optString("transport_id")
+                .takeIf { it.isNotBlank() }
+        }.getOrNull()
     }
 
     companion object {
