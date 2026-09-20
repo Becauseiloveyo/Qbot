@@ -8,7 +8,7 @@ import java.security.MessageDigest
 enum class ConversationIdentityQuality {
     APP_SHORTCUT,
     APP_LOCUS,
-    TITLE_FALLBACK,
+    TITLE_SLOT_FALLBACK,
     NOTIFICATION_SLOT,
 }
 
@@ -55,8 +55,8 @@ class NotificationConversationIdentityResolver {
             ?.let { title ->
                 return resolved(
                     packageName = packageName,
-                    quality = ConversationIdentityQuality.TITLE_FALLBACK,
-                    material = normalizeTitle(title),
+                    quality = ConversationIdentityQuality.TITLE_SLOT_FALLBACK,
+                    material = normalizeTitle(title) + "|" + sbn.key,
                 )
             }
 
@@ -68,18 +68,15 @@ class NotificationConversationIdentityResolver {
             ?.let { title ->
                 return resolved(
                     packageName = packageName,
-                    quality = ConversationIdentityQuality.TITLE_FALLBACK,
-                    material = normalizeTitle(title),
+                    quality = ConversationIdentityQuality.TITLE_SLOT_FALLBACK,
+                    material = normalizeTitle(title) + "|" + sbn.key,
                 )
             }
 
         return resolved(
             packageName = packageName,
             quality = ConversationIdentityQuality.NOTIFICATION_SLOT,
-            material = listOf(
-                sbn.tag.orEmpty(),
-                sbn.id.toString(),
-            ).joinToString("|"),
+            material = sbn.key,
         )
     }
 
