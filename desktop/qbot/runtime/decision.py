@@ -1,15 +1,31 @@
 from __future__ import annotations
 
+from typing import Protocol
 from uuid import uuid4
 
 from qbot.domain.actions import ActionProposal, RiskClass
 from qbot.domain.events import NormalizedEvent
 
 
-class MockDecisionEngine:
-    """Deterministic stand-in for the future LLM decision layer."""
+class DecisionEngine(Protocol):
+    async def decide(
+        self,
+        *,
+        run_id: str,
+        event: NormalizedEvent,
+    ) -> ActionProposal:
+        ...
 
-    def decide(self, *, run_id: str, event: NormalizedEvent) -> ActionProposal:
+
+class MockDecisionEngine:
+    """Deterministic stand-in for the model-facing decision layer."""
+
+    async def decide(
+        self,
+        *,
+        run_id: str,
+        event: NormalizedEvent,
+    ) -> ActionProposal:
         return ActionProposal(
             proposal_id=f"proposal-{uuid4()}",
             run_id=run_id,

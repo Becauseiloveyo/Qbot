@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.3 — LLM + Persona + Context
-Current branch: `feature/desktop-v0.2-runtime`
+Current milestone: v0.4 — Durable Recovery + Policy
+Current branch: `feature/desktop-v0.3-agent-context`
 
 ## Current objective
 
-Build the model-facing layer without weakening durable-state guarantees: provider/router abstraction, Persona + Contact profiles, ContextBuilder with token budgets, and structured ActionProposal generation.
+Complete v0.4 recovery/operations guarantees: startup recovery of unfinished runs/outbox effects, full task-step checkpoint commits, journal inspection, backup/migration/Safe Mode, and reconciliation workflows.
 
 ## Completed
 
@@ -89,19 +89,45 @@ Build the model-facing layer without weakening durable-state guarantees: provide
 - Added tests for token header, event/API multiplexing, timeout uncertainty, read-only diagnostics, and actual reconnect to a second fake connection.
 - Conformance #101 and Desktop Tests #75 passed after CLI/reconnect/diagnostic integration.
 - v0.2 implementation is complete enough for v0.3; real NapCat live verification remains an environment check on a machine running QQ/NapCat.
+- Added provider-neutral `LlmProvider`, `LlmRequest`, `LlmResponse`, and role-specific `ModelRole` contracts.
+- Added deterministic `MockLlmProvider` and `ModelRouter` with independent decision/chat/summary/memory routes.
+- Added immutable `Persona` and `ContactProfile` models with stable-prefix rendering.
+- Added `ContextBuilder` with a conservative mixed Chinese/ASCII token estimator.
+- ContextBuilder treats System/Persona/Active Task/Checkpoint/Current Message as mandatory; optional decisions/memory/summary/recent history are dropped first when budget is tight.
+- External contact text is explicitly wrapped as `UNTRUSTED_EXTERNAL_MESSAGE`.
+- Added tests proving a short context budget preserves Active Task + Checkpoint, and an impossible budget raises rather than silently dropping durable state.
+- Added OpenAI-compatible `/chat/completions` provider with runtime-only `SecretStr` API key handling and optional JSON-object mode.
+- Added strict `ActionProposalParser`: prose/fenced output, invalid schema, and mismatched AgentRun IDs are rejected rather than repaired heuristically.
+- Added model fallback chains scoped only to the LLM call; fallback never replays committed Qbot side effects.
+- Added LLM call journal metadata (role/provider/model/usage/message count/token estimate) without prompts or secrets.
+- Fixed ContextBuilder/LLM circular dependency by moving prompt-message type to package-neutral `qbot.prompt`.
+- Decision contract tokens are included in the total input budget instead of bypassing TokenBudget.
+- Added async pluggable `DecisionEngine` interface and `ContextualLlmDecisionEngine` adapter.
+- Added `ContextSource` contract whose `load()` is called for every reasoning execution; tests prove changed checkpoints are re-read rather than cached.
+- Added Desktop SQLite `tasks`, `task_steps`, and `task_checkpoints` tables and bumped Desktop DB schema to version 2.
+- Added read-only `ContextStateRepository` and `DurableSqliteContextSource` that load the active non-terminal Task, matching latest Checkpoint for the current task version, important decisions, and recent messages before each model call.
+- Added a regression test that updates Task version/checkpoint between two decisions and proves the second prompt contains only the new checkpoint state.
+- After fixes, Desktop Tests #127 / Conformance #153 passed for async decision integration; Desktop Tests #137 / Conformance #163 passed for SQLite-backed Task/Checkpoint context reload.
+
+- Added persistent Persona and ContactProfile tables, default Persona selection, per-contact Persona override, and versioned updates; Desktop DB schema is now version 3.
+- `DurableSqliteContextSource` reloads Persona, ContactProfile, active Task, matching Checkpoint, important decisions, and recent messages on every decision.
+- Added role-based runtime-only LLM environment configuration for decision/chat/summary/memory with role-specific overrides and non-persisted API keys.
+- Added explicit `--agent-mode observe|assist`; default is `observe`, while `assist` wires SQLite context + LLM DecisionEngine through existing Policy + Outbox.
+- `REQUEST_HUMAN` is deterministically elevated to R2/REQUIRE_HUMAN even if the model labels it R0.
+- Added tests proving R2 actions enter `WAITING_USER` and create zero Outbox effects.
+- Added full restart/context-reset integration test: process closes DB/runtime, Task advances to a new version/checkpoint, fresh ContextSource/ModelRouter/model objects are created, and the next reply uses only the new durable state through LLM -> Policy -> Outbox.
+- Conformance #190 / Desktop Tests #164 passed for persona/env/assist gating; Conformance #192 / Desktop Tests #166 passed for the full context-reset durable continuation path.
+- v0.3 roadmap deliverables are complete.
 
 ## In progress
 
-- Start v0.3 LLM provider/router abstraction.
-- Add Persona + Contact profile models.
-- Add ContextBuilder that always restores Task/Checkpoint before model invocation.
-- Add token-budget trimming rules with task/checkpoint priority.
+- Start startup recovery for unfinished AgentRuns and Outbox records.
+- Add deterministic recovery planning before any replayed side effect.
 
 ## Not started
 
 - Android application skeleton.
 - Android QQ transport adapters.
-- LLM router.
 - Persona/contact UI.
 - Memory retrieval implementation.
 - Coordinator and phone/PC synchronization.
@@ -132,13 +158,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create v0.3 implementation branch from the tested v0.2 head.
-2. Add provider-neutral LLM request/response interface and deterministic MockLLM.
-3. Add model router with role-specific profiles: decision, chat, summary, memory.
-4. Add Persona and ContactProfile models with stable-prefix rendering.
-5. Add ContextBuilder + TokenBudget that always preserves System/Persona/Active Task/Checkpoint/Current Message before optional history.
-6. Add tests proving short context windows still retain task/checkpoint continuity.
-7. Only after the model-facing contracts are deterministic, add an OpenAI-compatible HTTP provider.
+1. Create v0.4 implementation branch from the fully tested v0.3 head.
+2. Add startup RecoveryPlanner for non-terminal AgentRuns and PENDING/SENDING/SENDING_UNKNOWN Outbox rows.
+3. Never blindly replay `SENDING_UNKNOWN`; reconcile only when transport capability permits, otherwise surface manual recovery state.
+4. Add full TaskStep + Checkpoint commit repository with optimistic task version / writer-epoch checks.
+5. Add read-only event journal inspection CLI.
+6. Add backup -> migration -> integrity check -> Safe Mode bootstrap flow and tests.
+7. Add crash-injection recovery tests before moving to Android v0.5.
 
 ## Resume rule
 

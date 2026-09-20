@@ -33,6 +33,7 @@ class OneBotTransportConfig(BaseModel):
     url: str = Field(default="ws://127.0.0.1:3001/")
     access_token: str | None = None
     api_timeout_seconds: float = Field(default=10.0, gt=0)
+    connect_timeout_seconds: float = Field(default=10.0, gt=0)
     reconnect_initial_seconds: float = Field(default=1.0, gt=0)
     reconnect_max_seconds: float = Field(default=30.0, gt=0)
 
@@ -242,7 +243,7 @@ class OneBotForwardWsTransport(QQTransport):
         try:
             await asyncio.wait_for(
                 self._connected.wait(),
-                timeout=self.config.api_timeout_seconds,
+                timeout=self.config.connect_timeout_seconds,
             )
         except (TimeoutError, asyncio.TimeoutError) as exc:
             await self.stop()

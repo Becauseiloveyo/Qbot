@@ -21,7 +21,7 @@ class DatabaseTests(unittest.TestCase):
                 self.assertEqual(str(db.pragma("journal_mode")).lower(), "wal")
                 self.assertEqual(int(db.pragma("foreign_keys")), 1)
                 self.assertGreaterEqual(int(db.pragma("busy_timeout")), 5000)
-                self.assertEqual(db.meta("db_schema_version"), "1")
+                self.assertEqual(db.meta("db_schema_version"), "3")
                 self.assertEqual(db.meta("qbot_spec_version"), "0.1.0")
                 self.assertEqual(db.meta("node_id"), "test-node")
             finally:
