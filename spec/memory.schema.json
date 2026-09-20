@@ -3,37 +3,266 @@
   "$id": "https://qbot.local/spec/memory.schema.json",
   "title": "Qbot Memory Record",
   "type": "object",
-  "required": ["schema_version", "memory_id", "state", "scope", "content", "provenance", "trust", "created_at"],
+  "required": [
+    "schema_version",
+    "memory_id",
+    "state",
+    "scope",
+    "content",
+    "provenance",
+    "trust",
+    "created_at"
+  ],
   "properties": {
-    "schema_version": { "const": "0.1.0" },
-    "memory_id": { "type": "string", "minLength": 1 },
-    "state": { "type": "string", "enum": ["CANDIDATE", "PROMOTED", "SUPERSEDED", "REJECTED", "EXPIRED"] },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "memory_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "CANDIDATE",
+        "PROMOTED",
+        "SUPERSEDED",
+        "REJECTED",
+        "EXPIRED"
+      ]
+    },
     "scope": {
       "type": "string",
-      "enum": ["SYSTEM_POLICY", "USER_PERSONA", "CONTACT_PROFILE", "CONVERSATION_MEMORY", "TASK_MEMORY"]
+      "enum": [
+        "SYSTEM_POLICY",
+        "USER_PERSONA",
+        "CONTACT_PROFILE",
+        "CONVERSATION_MEMORY",
+        "TASK_MEMORY"
+      ]
     },
-    "owner_id": { "type": ["string", "null"] },
-    "conversation_id": { "type": ["string", "null"] },
-    "task_id": { "type": ["string", "null"] },
-    "content": { "type": "string", "minLength": 1 },
-    "entities": { "type": "array", "items": { "type": "string" } },
-    "importance": { "type": "number", "minimum": 0, "maximum": 1 },
-    "trust": { "type": "number", "minimum": 0, "maximum": 1 },
-    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "owner_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "conversation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "importance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "trust": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
     "provenance": {
       "type": "object",
-      "required": ["source_type"],
+      "required": [
+        "source_type"
+      ],
       "properties": {
-        "source_type": { "type": "string", "enum": ["SYSTEM", "USER_SELF", "CONTACT", "AGENT_INFERENCE", "IMPORT"] },
-        "source_message_id": { "type": ["string", "null"] },
-        "source_event_id": { "type": ["string", "null"] }
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "SYSTEM",
+            "USER_SELF",
+            "CONTACT",
+            "AGENT_INFERENCE",
+            "IMPORT"
+          ]
+        },
+        "source_message_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_event_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       },
       "additionalProperties": false
     },
-    "valid_from": { "type": ["string", "null"], "format": "date-time" },
-    "valid_to": { "type": ["string", "null"], "format": "date-time" },
-    "supersedes": { "type": ["string", "null"] },
-    "created_at": { "type": "string", "format": "date-time" }
+    "valid_from": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "valid_to": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "supersedes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "source_type": {
+                "const": "CONTACT"
+              }
+            },
+            "required": [
+              "source_type"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "enum": [
+              "CONTACT_PROFILE",
+              "CONVERSATION_MEMORY",
+              "TASK_MEMORY"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "SYSTEM_POLICY"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "source_type": {
+                "const": "SYSTEM"
+              }
+            },
+            "required": [
+              "source_type"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "CONTACT_PROFILE"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "owner_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "owner_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "CONVERSATION_MEMORY"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "conversation_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "TASK_MEMORY"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "task_id"
+        ]
+      }
+    }
+  ]
 }
