@@ -146,6 +146,7 @@ class AccessibilityUiReplySessionTest {
 
         override fun setComposerText(
             profile: AccessibilityUiProfile,
+            expectedConversationToken: String,
             text: String,
         ): Boolean {
             setTextCalls += 1
@@ -158,6 +159,7 @@ class AccessibilityUiReplySessionTest {
 
         override fun clickSend(
             profile: AccessibilityUiProfile,
+            expectedConversationToken: String,
         ): Boolean {
             clickCalls += 1
             return true
