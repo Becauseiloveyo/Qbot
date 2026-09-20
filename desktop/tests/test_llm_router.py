@@ -31,6 +31,36 @@ class ModelRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.provider, "chat-provider")
         self.assertEqual(response.model, "large")
 
+    async def test_fallback_occurs_only_inside_model_call(self) -> None:
+        calls: list[str] = []
+
+        def fail(_request):
+            calls.append("primary")
+            raise RuntimeError("provider unavailable")
+
+        def succeed(_request):
+            calls.append("fallback")
+            return "ok"
+
+        router = ModelRouter()
+        router.register(
+            ModelRole.DECISION,
+            MockLlmProvider(name="primary", responder=fail),
+        )
+        router.add_fallback(
+            ModelRole.DECISION,
+            MockLlmProvider(name="fallback", responder=succeed),
+        )
+
+        response = await router.complete(
+            LlmRequest(
+                role=ModelRole.DECISION,
+                messages=(LlmMessage(role="user", content="hello"),),
+            )
+        )
+        self.assertEqual(calls, ["primary", "fallback"])
+        self.assertEqual(response.provider, "fallback")
+
 
 if __name__ == "__main__":
     unittest.main()
