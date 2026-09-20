@@ -253,6 +253,55 @@ def assert_journal_invariants(
             )
 
 
+def assert_memory_invariants(
+    fixture: dict[str, Any],
+    path: Path,
+    records: list[dict[str, Any]],
+) -> None:
+    if not records:
+        return
+
+    by_id = {item["memory_id"]: item for item in records}
+    for item in records:
+        source_type = item["provenance"]["source_type"]
+        scope = item["scope"]
+
+        if source_type == "CONTACT" and scope in {
+            "SYSTEM_POLICY",
+            "USER_PERSONA",
+        }:
+            raise ValidationFailure(
+                f"{path}: CONTACT memory may not target trusted scope {scope}"
+            )
+
+        if scope == "SYSTEM_POLICY" and source_type != "SYSTEM":
+            raise ValidationFailure(
+                f"{path}: SYSTEM_POLICY memory must have SYSTEM provenance"
+            )
+
+        supersedes = item.get("supersedes")
+        if item["state"] == "PROMOTED" and supersedes is not None:
+            old = by_id.get(supersedes)
+            if old is None:
+                raise ValidationFailure(
+                    f"{path}: promoted memory supersedes missing record {supersedes}"
+                )
+            if old["state"] != "SUPERSEDED":
+                raise ValidationFailure(
+                    f"{path}: superseded predecessor {supersedes} "
+                    f"must be SUPERSEDED"
+                )
+            domain_keys = (
+                "scope",
+                "owner_id",
+                "conversation_id",
+                "task_id",
+            )
+            if any(item.get(key) != old.get(key) for key in domain_keys):
+                raise ValidationFailure(
+                    f"{path}: supersede relation crosses memory domain"
+                )
+
 def assert_invariants(fixture: dict[str, Any], path: Path) -> None:
     given = fixture.get("given", {})
     task = given.get("active_task")
@@ -261,6 +310,7 @@ def assert_invariants(fixture: dict[str, Any], path: Path) -> None:
     events = given.get("events", [])
     outboxes = given.get("outboxes", [])
     journal_events = given.get("journal_events", [])
+    memory_records = given.get("memories", [])
 
     if task is not None:
         assert_task_invariants(fixture, path, task)
@@ -278,6 +328,7 @@ def assert_invariants(fixture: dict[str, Any], path: Path) -> None:
     assert_event_idempotency(fixture, path, events)
     assert_outbox_idempotency(fixture, path, outboxes)
     assert_journal_invariants(fixture, path, journal_events)
+    assert_memory_invariants(fixture, path, memory_records)
 
 
 def validate_fixture(path: Path) -> None:
@@ -292,6 +343,7 @@ def validate_fixture(path: Path) -> None:
         "active_task": "task",
         "checkpoint": "checkpoint",
         "outbox": "outbox",
+        "memory": "memory",
     }
     for key, schema_name in singular_mapping.items():
         if key in given:
@@ -301,6 +353,7 @@ def validate_fixture(path: Path) -> None:
         "events": "event",
         "outboxes": "outbox",
         "journal_events": "journal_event",
+        "memories": "memory",
     }
     for key, schema_name in plural_mapping.items():
         if key in given:
