@@ -21,6 +21,7 @@ class SendExecutor(
             outboxId = outboxId,
             targetStatus = "SENDING",
             incrementAttempt = true,
+            attemptTransportId = transport.name,
         )
         val message = OutgoingMessage(
             accountId = sending.accountId,
