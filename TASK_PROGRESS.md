@@ -3,7 +3,7 @@
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
 Current milestone: v0.3 — LLM + Persona + Context
-Current branch: `feature/desktop-v0.2-runtime`
+Current branch: `feature/desktop-v0.3-agent-context`
 
 ## Current objective
 
@@ -89,13 +89,18 @@ Build the model-facing layer without weakening durable-state guarantees: provide
 - Added tests for token header, event/API multiplexing, timeout uncertainty, read-only diagnostics, and actual reconnect to a second fake connection.
 - Conformance #101 and Desktop Tests #75 passed after CLI/reconnect/diagnostic integration.
 - v0.2 implementation is complete enough for v0.3; real NapCat live verification remains an environment check on a machine running QQ/NapCat.
+- Added provider-neutral `LlmProvider`, `LlmRequest`, `LlmResponse`, and role-specific `ModelRole` contracts.
+- Added deterministic `MockLlmProvider` and `ModelRouter` with independent decision/chat/summary/memory routes.
+- Added immutable `Persona` and `ContactProfile` models with stable-prefix rendering.
+- Added `ContextBuilder` with a conservative mixed Chinese/ASCII token estimator.
+- ContextBuilder treats System/Persona/Active Task/Checkpoint/Current Message as mandatory; optional decisions/memory/summary/recent history are dropped first when budget is tight.
+- External contact text is explicitly wrapped as `UNTRUSTED_EXTERNAL_MESSAGE`.
+- Added tests proving a short context budget preserves Active Task + Checkpoint, and an impossible budget raises rather than silently dropping durable state.
 
 ## In progress
 
-- Start v0.3 LLM provider/router abstraction.
-- Add Persona + Contact profile models.
-- Add ContextBuilder that always restores Task/Checkpoint before model invocation.
-- Add token-budget trimming rules with task/checkpoint priority.
+- Validate v0.3 model-facing contracts in CI.
+- Next: add OpenAI-compatible HTTP provider after deterministic interfaces pass.
 
 ## Not started
 
@@ -132,13 +137,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create v0.3 implementation branch from the tested v0.2 head.
-2. Add provider-neutral LLM request/response interface and deterministic MockLLM.
-3. Add model router with role-specific profiles: decision, chat, summary, memory.
-4. Add Persona and ContactProfile models with stable-prefix rendering.
-5. Add ContextBuilder + TokenBudget that always preserves System/Persona/Active Task/Checkpoint/Current Message before optional history.
-6. Add tests proving short context windows still retain task/checkpoint continuity.
-7. Only after the model-facing contracts are deterministic, add an OpenAI-compatible HTTP provider.
+1. Run Desktop Tests + Conformance on the v0.3 branch and fix failures.
+2. Add OpenAI-compatible HTTP provider with runtime-only API key/base URL configuration.
+3. Add structured JSON ActionProposal parser/validator for the decision model.
+4. Add model call journaling metadata without persisting secrets.
+5. Wire ContextBuilder + ModelRouter into a new decision path while keeping MockLLM as the default test provider.
+6. Add retry/fallback rules that never re-run already committed side effects.
 
 ## Resume rule
 
