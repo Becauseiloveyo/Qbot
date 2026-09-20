@@ -196,11 +196,17 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - Added Android MemoryRepository parity for candidate staging, promotion/rejection, supersede-domain validation, idempotent provenance-derived candidates, and journaled authoritative promotion.
 - Added Android Room tests for trust boundaries, provenance requirements, idempotency, append/supersede history, rejected-state protection, and migration registry coverage.
 - v0.7 persistence/staging checkpoint passed: Android Tests #224, Desktop Tests #491, and Conformance #517 all succeeded on commit `cfa29a9`.
+- Added Desktop deterministic `MemoryRetriever` over authoritative PROMOTED memory with explicit scope/domain requirements and temporal validity filtering.
+- Frozen cross-runtime-friendly integer scoring contract: keyword 40%, entity 20%, recency 15%, importance 10%, trust 15%; score components use 0-1000 integer units and deterministic tie-breaking.
+- Retrieval excludes CANDIDATE/REJECTED/SUPERSEDED records, wrong owner/conversation/task domains, future/not-yet-valid memory, expired memory, and lexical/entity-irrelevant records when the query supplies relevance signals.
+- Added deterministic Desktop retrieval tests for state/domain isolation, stable ranking, component scoring, temporal validity, explicit domain requirements, relevance fail-closed behavior, and repeatable limits.
+- ADR-021 records that FTS5/semantic backends may accelerate candidate discovery but cannot change eligibility, trust/domain boundaries, ranking semantics, or Active Task/Checkpoint force-loading.
+- Desktop Tests #495 and Conformance #521 passed on deterministic retrieval commit `6aea7f2`; Android Tests #226 is a full-branch regression run and was still in progress when this checkpoint was written.
 
 ## In progress
 
-- Implement deterministic memory retrieval over PROMOTED records: FTS/keyword, entity, temporal/recency, importance, and trust scoring.
-- Freeze deterministic filtering/scoring invariants before adding semantic retrieval or embeddings.
+- Port the frozen deterministic MemoryRetriever contract to Android with the same integer component scores, scope/domain filtering, temporal validity rules, and stable ordering.
+- Add cross-runtime parity fixtures so Desktop and Android produce the same eligible memory IDs and ordering for the same records/query.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
@@ -237,10 +243,10 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add a Desktop deterministic MemoryRetriever over PROMOTED memories with explicit domain/scope filters plus keyword/FTS, entity, temporal/recency, importance, and trust scoring.
-2. Add deterministic retrieval tests proving stable ordering, scope/domain isolation, and exclusion of CANDIDATE/REJECTED/SUPERSEDED records.
-3. Add the Android retrieval implementation only after the Desktop scoring contract is stable, then add cross-runtime parity fixtures.
-4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval is stable; do not make embeddings authoritative.
+1. Add Android deterministic MemoryRetriever parity using ADR-021 exactly: PROMOTED-only eligibility, explicit domain filters, temporal validity, integer keyword/entity/recency/importance/trust components, and identical tie-break rules.
+2. Add shared cross-runtime retrieval fixtures and extend conformance validation to assert identical eligibility/order for representative queries.
+3. Add SQLite FTS5 and Android Room FTS as candidate accelerators only after parity passes; indexed retrieval must preserve the frozen deterministic eligibility/ranking contract.
+4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval and FTS acceleration are stable; embeddings are never authoritative.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
 6. Add background candidate extraction/summarization only after durable staging/promotion and deterministic retrieval work independently.
 7. Run v0.7 cross-runtime exit tests and update memory/security documentation.
