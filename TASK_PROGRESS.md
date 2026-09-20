@@ -2,8 +2,8 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.5 — Android Standard Runtime
-Current branch: `feature/desktop-v0.4-recovery-policy`
+Current milestone: v0.6 — Android Enhanced Transports
+Current branch: `feature/android-v0.5-standard-runtime`
 
 ## Current objective
 
@@ -140,15 +140,45 @@ Build the first Android standard runtime that mirrors the frozen durable contrac
 - Conformance #226 / Desktop Tests #200 passed for startup RecoveryExecutor integration; Conformance #241 / Desktop Tests #215 passed for backup/migration/Safe Mode; Conformance #243 / Desktop Tests #217 passed for crash-injection recovery.
 - v0.4 roadmap deliverables are complete.
 
+- Android v0.5 Gradle/Compose project created on `feature/android-v0.5-standard-runtime` with AGP 9.4.0, Gradle 9.6, API 37, Room 2.8.5, WorkManager, DataStore, Coroutines, and KSP 2.3.10.
+- Android CI installs the Android 17 `platforms;android-37.0` preview SDK package; Robolectric 4.17 tests run on Java 21 with the required module `--add-opens`, while application source/bytecode compatibility remains Java 17.
+- Added Room schema v1 mappings for metadata, inbound events, AgentRuns, Tasks/TaskSteps/Checkpoints, Outbox, Journal, Persona, and ContactProfile with equivalent uniqueness/version/fencing fields to Desktop.
+- Android Room migration registry is explicit from schema v1 and does not enable destructive fallback.
+- Added platform-neutral Android `QQTransport` plus deterministic `FakeTransport` with dedupe-key delivery lookup and simulated acknowledgement loss after remote delivery.
+- Added deterministic Android EventNormalizer, per-account/conversation coroutine serialization, and atomic Room inbound admission transaction: fingerprint dedupe + MESSAGE_RECEIVED + one primary AgentRun + RUN_CREATED.
+- `AndroidCore` now transitions a new AgentRun to RESTORING and reloads the trigger event, active Task, and checkpoint matching the current Task version before further processing.
+- Added validated Android AgentRun state machine with conditional transitions and non-terminal run enumeration for restart recovery.
+- Added transactional Android Outbox state machine with `(account_id, dedupe_key)` idempotency, guarded transitions, SEND_UNKNOWN/MESSAGE_SENT journal entries, and crash-left SENDING -> SENDING_UNKNOWN recovery.
+- Added Android RecoveryPlanner matching Desktop safety semantics: PENDING may be a safe send candidate; SENDING_UNKNOWN reconciles only with DELIVERY_LOOKUP, otherwise MANUAL_REVIEW; SENT+EXECUTING plans local finalization; blind unknown replay is forbidden.
+- Added Android SendExecutor; ambiguous delivered sends reconcile through FakeTransport lookup without incrementing the transport attempt count a second time.
+- Added Robolectric/real Room file-database tests for duplicate inbound admission, close/reopen durability, Task/Checkpoint version restore, AgentRun state-machine persistence, Outbox recovery classification, and ambiguous send reconciliation.
+- Android Tests #53, Desktop Tests #290, and Conformance #316 all passed after the durable Room/Outbox/recovery test suite and Robolectric Java 21 fixes.
+- Draft PR #5 is the Android v0.5 validation surface.
+
+- Added standard Android QQ/TIM NotificationListener transport with package filtering, explicit identity-quality metadata, live RemoteInput/PendingIntent text replies, listener/transport health, and notification-access settings UI.
+- Notification-derived account/conversation IDs are explicitly local aliases, not canonical QQ UINs; title fallback is scoped to the notification slot to avoid same-name contact collisions.
+- Notification reply actions are ephemeral and never persisted; they are cleared on listener disconnect, transport stop, notification removal, or notification updates without RemoteInput.
+- Notification transport intentionally does not advertise DELIVERY_LOOKUP; ambiguous sends remain SENDING_UNKNOWN/MANUAL_REVIEW and are never blindly replayed.
+- Added transport send-readiness contract so temporary lack of a live RemoteInput action leaves durable PENDING effects untouched with zero transport attempts.
+- Added Android RecoveryExecutor and WorkManager startup/event-driven recovery. Safe PENDING effects send only when the transport is currently ready; successful send/reconcile finalizes an EXECUTING AgentRun once all effects are terminal.
+- Notification listener rehydrates reply capability from current active notifications after process restart and retriggers unique recovery whenever a new notification can restore reply capability.
+- Recovery wakeups use WorkManager APPEND_OR_REPLACE so a notification arriving while recovery is already running cannot be dropped; the recovery operations remain idempotent.
+- Added QbotApplication + AndroidRuntimeHost so the standard notification transport is started at process creation and inbound events are durably admitted/restored.
+- Added Robolectric/Room tests for QQ/TIM filtering, RemoteInput dispatch, notification removal/expiry, temporary send unavailability, process restart restore, recovery finalization, deferred PENDING -> capability-returned send, and no-blind-replay behavior.
+- Disabled Android automatic app backup for durable agent state; explicit Qbot backup/export remains the intended path.
+- CI now verifies Room schema v1 export and uploads qbot-room-schema-v1 as an artifact.
+- Android Tests #120, Desktop Tests #360, and Conformance #386 passed at the v0.5 exit point; Room schema verify/upload steps also passed.
+- v0.5 roadmap deliverables are complete.
+
 ## In progress
 
-- Create the Android v0.5 implementation branch and Gradle/Kotlin project skeleton.
-- Map the core Task/Checkpoint/AgentRun/Outbox/Event contracts into Room entities and DAOs.
+- Review current Android Accessibility/Shizuku capabilities and define the v0.6 enhanced transport contract without weakening the durable Outbox/policy boundary.
+- Add capability negotiation and adapter health/fallback semantics before implementing enhanced QQ operations.
 
 ## Not started
 
-- Android application skeleton.
-- Android QQ transport adapters.
+- Accessibility/Shizuku enhanced QQ transport implementation.
+- Expert/root/hook adapter implementation.
 - Persona/contact UI.
 - Memory retrieval implementation.
 - Coordinator and phone/PC synchronization.
@@ -179,13 +209,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create `feature/android-v0.5-standard-runtime` from the tested v0.4 head.
-2. Add Android Gradle project using Kotlin, Jetpack Compose, Room, Coroutines/Flow, WorkManager, and DataStore without coupling Agent Core to QQ-specific APIs.
-3. Add Room entities/DAOs for inbound event, AgentRun, Task/TaskStep/Checkpoint, Outbox, Persona/ContactProfile, Journal, and metadata with the same uniqueness/version invariants as Desktop.
-4. Add Room migrations from the first schema onward; destructive migration fallback is forbidden.
-5. Add platform-neutral Android `QQTransport` capability interface and deterministic FakeTransport for tests.
-6. Add recoverable Android event pipeline: normalize -> dedupe -> per-conversation serialization -> AgentRun -> restore durable state.
-7. Add standard NotificationListener adapter boundary only after the durable fake end-to-end path passes tests.
+1. Create feature/android-v0.6-enhanced-transports from the tested v0.5 head.
+2. Review Android 17 AccessibilityService and Shizuku APIs/constraints and document what each adapter can actually prove/support.
+3. Define enhanced transport capability negotiation, health, and fallback ordering without exposing platform-specific APIs to Agent Core.
+4. Implement an Accessibility adapter only for capabilities that can be identified and tested reliably; keep send side effects behind Outbox + policy.
+5. Add Shizuku as an optional capability provider rather than a mandatory runtime dependency.
+6. Keep expert/root/LSPosed hook integration behind a separate experimental adapter boundary.
+7. Add conformance/regression tests showing fallback never duplicates an Outbox effect across Standard/Enhanced adapters.
 
 ## Resume rule
 
