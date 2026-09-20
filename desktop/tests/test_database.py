@@ -17,13 +17,16 @@ class DatabaseTests(unittest.TestCase):
             )
             db = Database(config)
             try:
-                db.bootstrap()
+                report = db.bootstrap()
+                self.assertFalse(report.safe_mode)
+                self.assertTrue(report.integrity_ok)
                 self.assertEqual(str(db.pragma("journal_mode")).lower(), "wal")
                 self.assertEqual(int(db.pragma("foreign_keys")), 1)
                 self.assertGreaterEqual(int(db.pragma("busy_timeout")), 5000)
                 self.assertEqual(db.meta("db_schema_version"), "3")
                 self.assertEqual(db.meta("qbot_spec_version"), "0.1.0")
                 self.assertEqual(db.meta("node_id"), "test-node")
+                self.assertIsNotNone(db.meta("last_integrity_check_at"))
             finally:
                 db.close()
 

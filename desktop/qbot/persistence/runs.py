@@ -43,6 +43,21 @@ class AgentRunRepository:
     def __init__(self, database: Database) -> None:
         self.database = database
 
+    def list_by_status(
+        self,
+        statuses: tuple[str, ...] | list[str] | set[str],
+    ) -> list[AgentRunRecord]:
+        values = tuple(statuses)
+        if not values:
+            return []
+        with self.database.engine.connect() as conn:
+            rows = conn.execute(
+                select(agent_runs)
+                .where(agent_runs.c.status.in_(values))
+                .order_by(agent_runs.c.created_at.asc(), agent_runs.c.run_id.asc())
+            ).mappings().all()
+        return [AgentRunRecord(**dict(row)) for row in rows]
+
     def load(self, run_id: str) -> AgentRunRecord | None:
         with self.database.engine.connect() as conn:
             row = conn.execute(

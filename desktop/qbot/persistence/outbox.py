@@ -120,6 +120,51 @@ class OutboxRepository:
             ) from exc
         return self.load(outbox_id)
 
+    def list_for_run(self, run_id: str) -> list[OutboxRecord]:
+        with self.database.engine.connect() as conn:
+            rows = conn.execute(
+                select(outbox_messages)
+                .where(outbox_messages.c.run_id == run_id)
+                .order_by(
+                    outbox_messages.c.created_at.asc(),
+                    outbox_messages.c.outbox_id.asc(),
+                )
+            ).mappings().all()
+        return [OutboxRecord(**dict(row)) for row in rows]
+
+    def list_by_status(
+        self,
+        statuses: tuple[str, ...] | list[str] | set[str],
+    ) -> list[OutboxRecord]:
+        values = tuple(statuses)
+        if not values:
+            return []
+        with self.database.engine.connect() as conn:
+            rows = conn.execute(
+                select(outbox_messages)
+                .where(outbox_messages.c.status.in_(values))
+                .order_by(
+                    outbox_messages.c.created_at.asc(),
+                    outbox_messages.c.outbox_id.asc(),
+                )
+            ).mappings().all()
+        return [OutboxRecord(**dict(row)) for row in rows]
+
+    def recover_interrupted_sends(self) -> list[OutboxRecord]:
+        """Convert crash-left SENDING records to explicit uncertainty."""
+
+        interrupted = self.list_by_status(("SENDING",))
+        recovered: list[OutboxRecord] = []
+        for record in interrupted:
+            recovered.append(
+                self.transition(
+                    record.outbox_id,
+                    "SENDING_UNKNOWN",
+                    error="process restarted while transport send was in flight",
+                )
+            )
+        return recovered
+
     def find_by_dedupe(
         self,
         *,

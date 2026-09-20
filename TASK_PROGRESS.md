@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.4 — Durable Recovery + Policy
-Current branch: `feature/desktop-v0.3-agent-context`
+Current milestone: v0.5 — Android Standard Runtime
+Current branch: `feature/desktop-v0.4-recovery-policy`
 
 ## Current objective
 
-Complete v0.4 recovery/operations guarantees: startup recovery of unfinished runs/outbox effects, full task-step checkpoint commits, journal inspection, backup/migration/Safe Mode, and reconciliation workflows.
+Build the first Android standard runtime that mirrors the frozen durable contracts: Kotlin/Compose project, Room persistence, common-spec mappings, recoverable event processing, and a capability-bounded standard QQ adapter.
 
 ## Completed
 
@@ -119,10 +119,31 @@ Complete v0.4 recovery/operations guarantees: startup recovery of unfinished run
 - Conformance #190 / Desktop Tests #164 passed for persona/env/assist gating; Conformance #192 / Desktop Tests #166 passed for the full context-reset durable continuation path.
 - v0.3 roadmap deliverables are complete.
 
+- Added deterministic `RecoveryPlanner` for non-terminal AgentRuns and Outbox effects.
+- Crash-left `SENDING` records are immediately reclassified to `SENDING_UNKNOWN` with a journaled uncertainty event.
+- Recovery classifies PENDING as safe send candidates, unknown delivery as reconcile/manual-review depending on `DELIVERY_LOOKUP`, WAITING_USER as preserved, and SENT+EXECUTING as local-only finalization; unknown sends are never blindly replayed.
+- Added recovery tests covering reconcile-capable and non-reconcile transports, PENDING effects, local finalization, resumable runs, and WAITING_USER preservation.
+- Added `TaskRepository` with atomic `start_step` / `complete_step`: task version + writer epoch guards, one RUNNING step, Task/TaskStep mutation, Checkpoint creation, and Journal entries commit in one transaction.
+- Added stale-version/stale-epoch rollback tests and automatic Task completion after the final step.
+- Added read-only `JournalRepository.query()` and `qbot-desktop journal` filtering by run/task/conversation/event type; inspection does not bootstrap or mutate an existing DB.
+- v0.4 draft PR #4 opened as the recovery/policy validation surface.
+- Conformance #213 and Desktop Tests #187 passed after RecoveryPlanner, transactional Task checkpoints, and journal inspection were added.
+
+- Added `RecoveryExecutor` and startup integration. Observe mode reports recovery only; assist mode executes only classified safe actions while MANUAL_REVIEW/WAITING_USER remain deferred.
+- Startup assist safely sends durable PENDING effects once, reconciles `SENDING_UNKNOWN` only through delivery lookup, finalizes SENT-but-interrupted AgentRuns locally, and is idempotent across repeated restarts.
+- Added startup restart integration tests proving observe performs no send and repeated assist restart does not duplicate an already SENT effect.
+- Replaced implicit schema overwrite behavior with explicit Desktop migration registry (v1->v2->v3), SQLite backup before migration, required-table validation, `integrity_check`, `foreign_key_check`, and `last_integrity_check_at` metadata.
+- Added in-memory BootstrapReport/Safe Mode state; authoritative `Database.transaction()` mutations are blocked while Safe Mode is active.
+- Safe Mode prevents QQ transport startup and RecoveryExecutor execution; `qbot-desktop safe-mode` provides read-only health diagnostics and optional consistent SQLite snapshot export.
+- Added migration tests proving the backup retains the pre-migration schema, known v1 migrates to v3, newer/unknown schema enters Safe Mode, and diagnostics do not mutate the database.
+- Added crash-injection tests: failure before checkpoint commit rolls back Task+Step+Checkpoint atomically; failure after remote delivery but before local SENT commit restarts as SENDING_UNKNOWN and reconciles without a second send.
+- Conformance #226 / Desktop Tests #200 passed for startup RecoveryExecutor integration; Conformance #241 / Desktop Tests #215 passed for backup/migration/Safe Mode; Conformance #243 / Desktop Tests #217 passed for crash-injection recovery.
+- v0.4 roadmap deliverables are complete.
+
 ## In progress
 
-- Start startup recovery for unfinished AgentRuns and Outbox records.
-- Add deterministic recovery planning before any replayed side effect.
+- Create the Android v0.5 implementation branch and Gradle/Kotlin project skeleton.
+- Map the core Task/Checkpoint/AgentRun/Outbox/Event contracts into Room entities and DAOs.
 
 ## Not started
 
@@ -158,13 +179,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Create v0.4 implementation branch from the fully tested v0.3 head.
-2. Add startup RecoveryPlanner for non-terminal AgentRuns and PENDING/SENDING/SENDING_UNKNOWN Outbox rows.
-3. Never blindly replay `SENDING_UNKNOWN`; reconcile only when transport capability permits, otherwise surface manual recovery state.
-4. Add full TaskStep + Checkpoint commit repository with optimistic task version / writer-epoch checks.
-5. Add read-only event journal inspection CLI.
-6. Add backup -> migration -> integrity check -> Safe Mode bootstrap flow and tests.
-7. Add crash-injection recovery tests before moving to Android v0.5.
+1. Create `feature/android-v0.5-standard-runtime` from the tested v0.4 head.
+2. Add Android Gradle project using Kotlin, Jetpack Compose, Room, Coroutines/Flow, WorkManager, and DataStore without coupling Agent Core to QQ-specific APIs.
+3. Add Room entities/DAOs for inbound event, AgentRun, Task/TaskStep/Checkpoint, Outbox, Persona/ContactProfile, Journal, and metadata with the same uniqueness/version invariants as Desktop.
+4. Add Room migrations from the first schema onward; destructive migration fallback is forbidden.
+5. Add platform-neutral Android `QQTransport` capability interface and deterministic FakeTransport for tests.
+6. Add recoverable Android event pipeline: normalize -> dedupe -> per-conversation serialization -> AgentRun -> restore durable state.
+7. Add standard NotificationListener adapter boundary only after the durable fake end-to-end path passes tests.
 
 ## Resume rule
 
