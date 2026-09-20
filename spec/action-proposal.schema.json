@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbot.local/spec/action-proposal.schema.json",
+  "title": "Qbot Action Proposal",
+  "type": "object",
+  "required": ["schema_version", "proposal_id", "run_id", "action", "risk_hint", "arguments"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": ["string", "null"] },
+    "action": {
+      "type": "string",
+      "enum": ["IGNORE", "SEND_MESSAGE", "CREATE_TASK", "UPDATE_TASK", "START_STEP", "COMPLETE_STEP", "FAIL_STEP", "PAUSE_TASK", "COMPLETE_TASK", "PROPOSE_MEMORY", "REQUEST_HUMAN"]
+    },
+    "risk_hint": { "type": "string", "enum": ["R0", "R1", "R2", "R3"] },
+    "arguments": { "type": "object", "additionalProperties": true },
+    "reason_summary": { "type": ["string", "null"] },
+    "source_message_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbot.local/spec/outbox.schema.json",
+  "title": "Qbot Outbox Message",
+  "type": "object",
+  "required": ["schema_version", "outbox_id", "run_id", "account_id", "conversation_id", "dedupe_key", "status", "payload", "created_at"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "outbox_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "account_id": { "type": "string", "minLength": 1 },
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "dedupe_key": { "type": "string", "minLength": 8 },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "SENDING", "SENT", "SENDING_UNKNOWN", "FAILED", "CANCELLED"]
+    },
+    "payload": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["TEXT", "RICH", "REACTION", "FILE"] },
+        "text": { "type": ["string", "null"] },
+        "content_ref": { "type": ["string", "null"] },
+        "reply_to_message_id": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "platform_message_id": { "type": ["string", "null"] },
+    "transport_attempts": { "type": "integer", "minimum": 0, "default": 0 },
+    "last_error": { "type": ["string", "null"] },
+    "writer_epoch": { "type": "integer", "minimum": 0, "default": 0 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "sent_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

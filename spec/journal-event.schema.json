@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qbot.local/spec/journal-event.schema.json",
+  "title": "Qbot Journal Event",
+  "type": "object",
+  "required": ["schema_version", "journal_id", "event_type", "occurred_at", "actor"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "journal_id": { "type": "string", "minLength": 1 },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "MESSAGE_RECEIVED",
+        "RUN_CREATED",
+        "TASK_RESTORED",
+        "STEP_STARTED",
+        "LLM_CALLED",
+        "ACTION_PROPOSED",
+        "ACTION_REJECTED",
+        "POLICY_DECIDED",
+        "OUTBOX_CREATED",
+        "MESSAGE_SENT",
+        "SEND_UNKNOWN",
+        "CHECKPOINT_COMMITTED",
+        "MEMORY_CANDIDATE_CREATED",
+        "MEMORY_PROMOTED",
+        "TASK_COMPLETED",
+        "RECOVERY_STARTED",
+        "RECOVERY_COMPLETED"
+      ]
+    },
+    "actor": { "type": "string", "enum": ["SYSTEM", "USER", "CONTACT", "AGENT", "TRANSPORT", "RECOVERY"] },
+    "account_id": { "type": ["string", "null"] },
+    "conversation_id": { "type": ["string", "null"] },
+    "task_id": { "type": ["string", "null"] },
+    "run_id": { "type": ["string", "null"] },
+    "related_id": { "type": ["string", "null"] },
+    "payload": { "type": "object", "additionalProperties": true },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

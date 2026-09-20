@@ -1,0 +1,97 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "basic durable task resume and send",
+  "given": {
+    "event": {
+      "schema_version": "0.1.0",
+      "event_id": "evt-002",
+      "fingerprint": "qq:acc-1:conv-1:msg-002",
+      "platform": "qq",
+      "transport": "mock",
+      "account_id": "acc-1",
+      "conversation_id": "conv-1",
+      "sender_id": "contact-1",
+      "platform_message_id": "msg-002",
+      "event_type": "MESSAGE_RECEIVED",
+      "message_type": "private",
+      "text": "弄好了吗",
+      "content_ref": null,
+      "reply_to_message_id": null,
+      "occurred_at": "2026-09-20T05:50:00Z",
+      "received_at": "2026-09-20T05:50:01Z",
+      "raw_ref": null,
+      "metadata": {}
+    },
+    "active_task": {
+      "schema_version": "0.1.0",
+      "task_id": "task-1",
+      "conversation_id": "conv-1",
+      "parent_task_id": null,
+      "goal": "整理项目修改方案并向联系人回复进度",
+      "status": "RUNNING",
+      "phase": "整理修改方案",
+      "constraints": ["不得声称未完成工作已经完成"],
+      "steps": [
+        {
+          "step_id": "step-1",
+          "sequence": 1,
+          "description": "读取项目背景",
+          "status": "SUCCEEDED",
+          "result": "已完成",
+          "error": null,
+          "started_at": "2026-09-20T05:00:00Z",
+          "completed_at": "2026-09-20T05:05:00Z"
+        },
+        {
+          "step_id": "step-2",
+          "sequence": 2,
+          "description": "整理修改方案",
+          "status": "RUNNING",
+          "result": null,
+          "error": null,
+          "started_at": "2026-09-20T05:05:01Z",
+          "completed_at": null
+        }
+      ],
+      "decisions": ["先给出问题清单，再执行修改"],
+      "blockers": [],
+      "next_action": "完成修改方案草稿",
+      "writer_epoch": 0,
+      "version": 3,
+      "created_at": "2026-09-20T05:00:00Z",
+      "updated_at": "2026-09-20T05:05:01Z"
+    },
+    "checkpoint": {
+      "schema_version": "0.1.0",
+      "checkpoint_id": "cp-3",
+      "task_id": "task-1",
+      "agent_run_id": "run-previous",
+      "task_version": 3,
+      "summary": "项目背景已读取，当前正在整理修改方案。",
+      "completed_step_ids": ["step-1"],
+      "pending_step_ids": ["step-2"],
+      "current_step_id": "step-2",
+      "decisions": ["先给出问题清单，再执行修改"],
+      "blockers": [],
+      "next_action": "完成修改方案草稿",
+      "context_digest": "sha256:test",
+      "writer_epoch": 0,
+      "created_at": "2026-09-20T05:05:02Z"
+    }
+  },
+  "expect": {
+    "restore_before_reasoning": true,
+    "must_include_task_goal": true,
+    "must_include_checkpoint_next_action": true,
+    "proposal_action": "SEND_MESSAGE",
+    "outbox_required": true,
+    "journal_events": [
+      "MESSAGE_RECEIVED",
+      "RUN_CREATED",
+      "TASK_RESTORED",
+      "ACTION_PROPOSED",
+      "OUTBOX_CREATED",
+      "CHECKPOINT_COMMITTED"
+    ]
+  }
+}

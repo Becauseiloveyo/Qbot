@@ -1,0 +1,98 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "journal preserves authoritative execution ordering",
+  "given": {
+    "journal_events": [
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-1",
+        "event_type": "MESSAGE_RECEIVED",
+        "actor": "TRANSPORT",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": null,
+        "run_id": null,
+        "related_id": "evt-1",
+        "payload": {},
+        "occurred_at": "2026-09-20T06:40:00Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-2",
+        "event_type": "RUN_CREATED",
+        "actor": "SYSTEM",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": "task-1",
+        "run_id": "run-1",
+        "related_id": "evt-1",
+        "payload": {},
+        "occurred_at": "2026-09-20T06:40:01Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-3",
+        "event_type": "TASK_RESTORED",
+        "actor": "SYSTEM",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": "task-1",
+        "run_id": "run-1",
+        "related_id": "cp-3",
+        "payload": {},
+        "occurred_at": "2026-09-20T06:40:02Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-4",
+        "event_type": "ACTION_PROPOSED",
+        "actor": "AGENT",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": "task-1",
+        "run_id": "run-1",
+        "related_id": "proposal-1",
+        "payload": {},
+        "occurred_at": "2026-09-20T06:40:03Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-5",
+        "event_type": "OUTBOX_CREATED",
+        "actor": "SYSTEM",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": "task-1",
+        "run_id": "run-1",
+        "related_id": "out-1",
+        "payload": {},
+        "occurred_at": "2026-09-20T06:40:04Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-6",
+        "event_type": "CHECKPOINT_COMMITTED",
+        "actor": "SYSTEM",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": "task-1",
+        "run_id": "run-1",
+        "related_id": "cp-4",
+        "payload": {},
+        "occurred_at": "2026-09-20T06:40:05Z"
+      }
+    ]
+  },
+  "expect": {
+    "journal_ids_unique": true,
+    "chronological": true,
+    "required_order": [
+      "MESSAGE_RECEIVED",
+      "RUN_CREATED",
+      "TASK_RESTORED",
+      "ACTION_PROPOSED",
+      "OUTBOX_CREATED",
+      "CHECKPOINT_COMMITTED"
+    ]
+  }
+}
