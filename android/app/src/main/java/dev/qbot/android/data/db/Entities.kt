@@ -340,3 +340,57 @@ data class ContactProfileEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: String,
 )
+
+@Entity(
+    tableName = "memories",
+    foreignKeys = [
+        ForeignKey(
+            entity = MemoryEntity::class,
+            parentColumns = ["memory_id"],
+            childColumns = ["supersedes"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+    indices = [
+        Index(value = ["conversation_id", "state", "created_at"]),
+        Index(value = ["task_id", "state", "created_at"]),
+        Index(value = ["scope", "owner_id", "state"]),
+        Index(value = ["source_event_id"]),
+        Index(value = ["supersedes"]),
+    ],
+)
+data class MemoryEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "memory_id")
+    val memoryId: String,
+    @ColumnInfo(name = "schema_version")
+    val schemaVersion: String,
+    val state: String,
+    val scope: String,
+    @ColumnInfo(name = "owner_id")
+    val ownerId: String?,
+    @ColumnInfo(name = "conversation_id")
+    val conversationId: String?,
+    @ColumnInfo(name = "task_id")
+    val taskId: String?,
+    val content: String,
+    @ColumnInfo(name = "entities_json")
+    val entitiesJson: String = "[]",
+    val importance: Double?,
+    val trust: Double,
+    val confidence: Double?,
+    @ColumnInfo(name = "source_type")
+    val sourceType: String,
+    @ColumnInfo(name = "source_message_id")
+    val sourceMessageId: String?,
+    @ColumnInfo(name = "source_event_id")
+    val sourceEventId: String?,
+    @ColumnInfo(name = "valid_from")
+    val validFrom: String?,
+    @ColumnInfo(name = "valid_to")
+    val validTo: String?,
+    val supersedes: String?,
+    @ColumnInfo(name = "created_at")
+    val createdAt: String,
+)
+

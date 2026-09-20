@@ -230,4 +230,51 @@ interface QbotDao {
 
     @Query("SELECT * FROM contact_profiles WHERE contact_id = :contactId LIMIT 1")
     suspend fun contact(contactId: String): ContactProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMemoryIfAbsent(memory: MemoryEntity): Long
+
+    @Query("SELECT * FROM memories WHERE memory_id = :memoryId LIMIT 1")
+    suspend fun memory(memoryId: String): MemoryEntity?
+
+    @Query(
+        """
+        SELECT * FROM memories
+        WHERE state = :state
+          AND (:conversationId IS NULL OR conversation_id = :conversationId)
+          AND (:taskId IS NULL OR task_id = :taskId)
+        ORDER BY created_at, memory_id
+        """,
+    )
+    suspend fun memoriesByState(
+        state: String,
+        conversationId: String? = null,
+        taskId: String? = null,
+    ): List<MemoryEntity>
+
+    @Query(
+        """
+        UPDATE memories
+        SET state = :targetState
+        WHERE memory_id = :memoryId AND state = :expectedState
+        """,
+    )
+    suspend fun transitionMemory(
+        memoryId: String,
+        expectedState: String,
+        targetState: String,
+    ): Int
+
+    @Query("SELECT COUNT(*) FROM memories")
+    suspend fun memoryCount(): Int
+
+    @Query(
+        """
+        SELECT * FROM event_journal
+        WHERE related_id = :relatedId
+        ORDER BY occurred_at, journal_id
+        """,
+    )
+    suspend fun journalForRelated(relatedId: String): List<JournalEntity>
+
 }
