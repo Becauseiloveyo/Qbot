@@ -3,11 +3,11 @@
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
 Current milestone: v0.6 — Android Enhanced Transports
-Current branch: `feature/android-v0.5-standard-runtime`
+Current branch: `feature/android-v0.6-enhanced-transports`
 
 ## Current objective
 
-Build the first Android standard runtime that mirrors the frozen durable contracts: Kotlin/Compose project, Room persistence, common-spec mappings, recoverable event processing, and a capability-bounded standard QQ adapter.
+Add Android enhanced transport capabilities behind the existing platform-neutral QQTransport boundary. Accessibility/Shizuku may improve observation or interaction only where their behavior can be identified, capability-reported, policy-gated, durably outboxed, and tested without weakening v0.5 recovery/idempotency guarantees.
 
 ## Completed
 
