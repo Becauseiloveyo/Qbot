@@ -86,6 +86,7 @@ class RoutedSendExecutorRoomTest {
             )
 
             val standard = ProbeTransport(
+                adapterName = "notification",
                 readiness = SendReadiness(
                     SendAvailability.TEMPORARILY_UNAVAILABLE,
                     "no live RemoteInput",
@@ -93,6 +94,7 @@ class RoutedSendExecutorRoomTest {
                 result = SendResult(accepted = true),
             )
             val accessibility = ProbeTransport(
+                adapterName = "accessibility",
                 readiness = SendReadiness(SendAvailability.READY),
                 result = SendResult(
                     accepted = true,
@@ -127,6 +129,10 @@ class RoutedSendExecutorRoomTest {
             assertEquals(1, result.outbox.transportAttempts)
             assertEquals(0, standard.sendCalls)
             assertEquals(1, accessibility.sendCalls)
+            assertEquals(
+                "accessibility",
+                outbox.lastAttemptTransportId(effect.outboxId),
+            )
         }
 
     @Test
@@ -147,6 +153,7 @@ class RoutedSendExecutorRoomTest {
             )
 
             val primary = ProbeTransport(
+                adapterName = "accessibility",
                 readiness = SendReadiness(SendAvailability.READY),
                 result = SendResult(
                     accepted = false,
@@ -156,6 +163,7 @@ class RoutedSendExecutorRoomTest {
                 ),
             )
             val secondary = ProbeTransport(
+                adapterName = "experimental",
                 readiness = SendReadiness(SendAvailability.READY),
                 result = SendResult(
                     accepted = true,
@@ -190,6 +198,10 @@ class RoutedSendExecutorRoomTest {
             assertEquals(1, result.outbox.transportAttempts)
             assertEquals(1, primary.sendCalls)
             assertEquals(0, secondary.sendCalls)
+            assertEquals(
+                "accessibility",
+                outbox.lastAttemptTransportId(effect.outboxId),
+            )
         }
 
     private fun binding(
@@ -241,12 +253,13 @@ class RoutedSendExecutorRoomTest {
         "id-" + ids.incrementAndGet()
 
     private class ProbeTransport(
+        private val adapterName: String,
         private val readiness: SendReadiness,
         private val result: SendResult,
     ) : QQTransport {
         var sendCalls = 0
 
-        override val name: String = "probe"
+        override val name: String = adapterName
         override val capabilities: Set<TransportCapability> =
             setOf(TransportCapability.SEND_TEXT)
 
