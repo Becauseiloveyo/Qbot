@@ -99,6 +99,23 @@ def _parser() -> argparse.ArgumentParser:
     journal.add_argument("--limit", type=int, default=100)
     journal.add_argument("--json", action="store_true")
 
+    safe = sub.add_parser(
+        "safe-mode",
+        help="Read-only database diagnostics; optionally export a SQLite snapshot",
+    )
+    safe.add_argument(
+        "--db",
+        default=os.getenv("QBOT_DB", "./data/qbot.db"),
+    )
+    safe.add_argument(
+        "--backup",
+        nargs="?",
+        const="",
+        default=None,
+        help="create a consistent snapshot; optionally specify destination path",
+    )
+    safe.add_argument("--json", action="store_true")
+
     return parser
 
 
@@ -150,9 +167,26 @@ async def _run(args: argparse.Namespace) -> int:
     if args.agent_mode == "assist":
         _configure_assist(runtime)
 
-    report = await runtime.start(
+    start_report = await runtime.start(
         recovery_mode=RecoveryMode(args.agent_mode)
     )
+    if start_report.safe_mode:
+        log_event(
+            logger,
+            "safe_mode_entered",
+            reason=start_report.bootstrap.reason,
+            schema_version=start_report.bootstrap.schema_version,
+            backup_path=(
+                str(start_report.bootstrap.backup_path)
+                if start_report.bootstrap.backup_path
+                else None
+            ),
+        )
+        await runtime.stop()
+        return 2
+
+    report = start_report.recovery
+    assert report is not None
     log_event(
         logger,
         "startup_recovery",
@@ -266,6 +300,44 @@ async def _journal(args: argparse.Namespace) -> int:
     return 0
 
 
+async def _safe_mode(args: argparse.Namespace) -> int:
+    db = Database(
+        QbotConfig(database_path=Path(args.db))
+    )
+    try:
+        diagnostic = db.diagnose()
+        backup_path = None
+        if args.backup is not None:
+            destination = Path(args.backup) if args.backup else None
+            backup_path = db.create_backup(destination)
+
+        payload = {
+            "exists": diagnostic.exists,
+            "schema_version": diagnostic.schema_version,
+            "target_schema_version": diagnostic.target_schema_version,
+            "integrity_ok": diagnostic.integrity_ok,
+            "foreign_keys_ok": diagnostic.foreign_keys_ok,
+            "issues": list(diagnostic.issues),
+            "backup_path": str(backup_path) if backup_path else None,
+        }
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(
+                "Qbot database diagnostic\n"
+                f"exists={payload['exists']}\n"
+                f"schema_version={payload['schema_version']}\n"
+                f"target_schema_version={payload['target_schema_version']}\n"
+                f"integrity_ok={payload['integrity_ok']}\n"
+                f"foreign_keys_ok={payload['foreign_keys_ok']}\n"
+                f"issues={payload['issues']}\n"
+                f"backup_path={payload['backup_path']}"
+            )
+        return 0 if not diagnostic.issues else 2
+    finally:
+        db.close()
+
+
 async def _amain(args: argparse.Namespace) -> int:
     if args.command == "run":
         return await _run(args)
@@ -273,6 +345,8 @@ async def _amain(args: argparse.Namespace) -> int:
         return await _diagnostic(args)
     if args.command == "journal":
         return await _journal(args)
+    if args.command == "safe-mode":
+        return await _safe_mode(args)
     raise RuntimeError(f"unsupported command: {args.command}")
 
 
