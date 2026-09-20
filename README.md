@@ -1,34 +1,59 @@
 # Qbot
 
-Qbot is an Android-first personal QQ reply agent.
+Qbot is a persistent personal QQ agent with two deployment targets:
 
-## v0.1 goals
+- **Qbot Android** — runs locally on the phone with replaceable Android QQ transport adapters.
+- **Qbot Desktop** — runs on PC/server, primarily through NapCat + OneBot.
 
-- Run locally on Android.
-- Keep a persistent per-contact conversation state.
-- Persist long-running task progress so a short model context window does not break continuity.
-- Before every model execution, rebuild context from durable state instead of trusting the previous LLM turn.
-- Keep recent raw messages, a rolling summary, durable facts, and explicit task checkpoints separately.
-- Default to assisted reply mode; high-risk messages require manual confirmation.
+The two runtimes share the same behavioral contracts, task/checkpoint model, memory rules, policy rules, and conformance tests under `spec/`.
 
-## Context continuity model
+## Core design
 
-Each conversation is reconstructed from:
+Qbot does not rely on the model's chat context as durable memory.
 
-1. Persona profile
-2. Contact profile
-3. Active task checkpoint
-4. Durable memories/facts
-5. Rolling conversation summary
-6. Recent raw messages
-7. Current incoming message
+Before each meaningful Agent run it restores:
 
-The active task checkpoint is stored independently from chat history. It contains the task goal, current phase, completed steps, pending steps, blockers, important decisions, and the next expected action.
+1. system/persona policy;
+2. contact state;
+3. active task;
+4. latest checkpoint;
+5. important decisions/constraints;
+6. trusted relevant memories;
+7. rolling summary;
+8. recent raw messages;
+9. current message.
 
-## Repository workflow for coding agents
+The LLM produces structured **ActionProposals**. Qbot validates them against schema, state-machine rules, action policy, transport capabilities, and writer ownership before performing side effects.
 
-Read `AGENTS.md` and `TASK_PROGRESS.md` before making changes. Update `TASK_PROGRESS.md` after every meaningful implementation session.
+## Durable execution
 
-## Status
+Long-running work is represented as structured tasks and steps. Progress is checkpointed so a model-context reset, model switch, app restart, Android process kill, network interruption, or later continuation does not require the model to remember prior turns.
 
-Bootstrap in progress. See `TASK_PROGRESS.md`.
+Outgoing messages pass through a durable Outbox. Ambiguous sends enter `SENDING_UNKNOWN` and are reconciled rather than blindly resent.
+
+## Repository continuity
+
+For any AI coding agent:
+
+1. read `AGENTS.md`;
+2. read `TASK_PROGRESS.md`;
+3. read `docs/ARCHITECTURE.md`;
+4. continue the first unfinished task recorded in the repository;
+5. update `TASK_PROGRESS.md` before ending meaningful work.
+
+Do not use conversation history as the source of truth for project progress.
+
+## Documentation
+
+- `docs/ARCHITECTURE.md` — frozen Qbot Architecture v1.2 FINAL.
+- `docs/ROADMAP.md` — v0.1 to v1.0 project plan.
+- `docs/STATE_MACHINES.md` — authoritative state transitions and invariants.
+- `docs/DECISIONS.md` — architecture decision log.
+- `spec/` — shared machine-readable contracts.
+- `tests/conformance/` — cross-runtime behavior fixtures.
+
+## Current status
+
+Development is in **v0.1: Common Spec + Durable Core Model**.
+
+See `TASK_PROGRESS.md` for the exact resumable development state.
