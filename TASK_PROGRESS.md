@@ -7,7 +7,7 @@ Current branch: `feature/desktop-v0.3-agent-context`
 
 ## Current objective
 
-Build the model-facing layer without weakening durable-state guarantees: provider/router abstraction, Persona + Contact profiles, ContextBuilder with token budgets, and structured ActionProposal generation.
+Finish v0.3 model-facing integration on top of durable state: persist/select Persona/Contact profiles, connect the SQLite-backed ContextSource to the runtime opt-in LLM decision path, and keep real OneBot operation observe-only until explicit automation policy is configured.
 
 ## Completed
 
@@ -96,11 +96,24 @@ Build the model-facing layer without weakening durable-state guarantees: provide
 - ContextBuilder treats System/Persona/Active Task/Checkpoint/Current Message as mandatory; optional decisions/memory/summary/recent history are dropped first when budget is tight.
 - External contact text is explicitly wrapped as `UNTRUSTED_EXTERNAL_MESSAGE`.
 - Added tests proving a short context budget preserves Active Task + Checkpoint, and an impossible budget raises rather than silently dropping durable state.
+- Added OpenAI-compatible `/chat/completions` provider with runtime-only `SecretStr` API key handling and optional JSON-object mode.
+- Added strict `ActionProposalParser`: prose/fenced output, invalid schema, and mismatched AgentRun IDs are rejected rather than repaired heuristically.
+- Added model fallback chains scoped only to the LLM call; fallback never replays committed Qbot side effects.
+- Added LLM call journal metadata (role/provider/model/usage/message count/token estimate) without prompts or secrets.
+- Fixed ContextBuilder/LLM circular dependency by moving prompt-message type to package-neutral `qbot.prompt`.
+- Decision contract tokens are included in the total input budget instead of bypassing TokenBudget.
+- Added async pluggable `DecisionEngine` interface and `ContextualLlmDecisionEngine` adapter.
+- Added `ContextSource` contract whose `load()` is called for every reasoning execution; tests prove changed checkpoints are re-read rather than cached.
+- Added Desktop SQLite `tasks`, `task_steps`, and `task_checkpoints` tables and bumped Desktop DB schema to version 2.
+- Added read-only `ContextStateRepository` and `DurableSqliteContextSource` that load the active non-terminal Task, matching latest Checkpoint for the current task version, important decisions, and recent messages before each model call.
+- Added a regression test that updates Task version/checkpoint between two decisions and proves the second prompt contains only the new checkpoint state.
+- After fixes, Desktop Tests #127 / Conformance #153 passed for async decision integration; Desktop Tests #137 / Conformance #163 passed for SQLite-backed Task/Checkpoint context reload.
 
 ## In progress
 
-- Validate v0.3 model-facing contracts in CI.
-- Next: add OpenAI-compatible HTTP provider after deterministic interfaces pass.
+- Persist Persona / ContactProfile selection instead of using only constructor-provided profiles.
+- Add explicit runtime configuration for LLM provider roles without persisting API keys.
+- Wire `ContextualLlmDecisionEngine` into Desktop runtime behind an explicit opt-in mode; default OneBot mode remains observe-only.
 
 ## Not started
 
@@ -137,12 +150,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Run Desktop Tests + Conformance on the v0.3 branch and fix failures.
-2. Add OpenAI-compatible HTTP provider with runtime-only API key/base URL configuration.
-3. Add structured JSON ActionProposal parser/validator for the decision model.
-4. Add model call journaling metadata without persisting secrets.
-5. Wire ContextBuilder + ModelRouter into a new decision path while keeping MockLLM as the default test provider.
-6. Add retry/fallback rules that never re-run already committed side effects.
+1. Add persistent Persona and ContactProfile storage + selection for ContextSource.
+2. Add runtime-only LLM environment configuration (base URL, model, API key) mapped to decision/chat/summary/memory roles.
+3. Add an explicit `--agent-mode observe|assist` gate; OneBot defaults to `observe`, and LLM-generated sends are not enabled implicitly.
+4. Wire the SQLite-backed ContextSource + LLM DecisionEngine into `assist` mode through the existing Policy + Outbox path.
+5. Add tests that R2 actions enter `WAITING_USER` and cannot reach Outbox automatically.
+6. Add integration test: persisted Task/Checkpoint -> LLM ActionProposal -> Policy -> Outbox, proving a context reset still continues the task correctly.
 
 ## Resume rule
 
