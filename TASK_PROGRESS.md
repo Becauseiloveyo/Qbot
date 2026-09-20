@@ -7,7 +7,7 @@ Current branch: `feature/desktop-v0.2-runtime`
 
 ## Current objective
 
-Build the first Desktop runtime skeleton on top of the now-stable v0.1 contracts: package layout, SQLite WAL bootstrap, configuration, transport abstraction, and MockTransport.
+Complete the durable Desktop core before NapCat integration: restore/progress AgentRuns, add Outbox persistence and send-result recording, then layer a mock reasoning/execution path on top.
 
 ## Completed
 
@@ -63,11 +63,19 @@ Build the first Desktop runtime skeleton on top of the now-stable v0.1 contracts
 - Deterministic `MockTransport` added with idempotent dedupe-key delivery and delivery lookup.
 - Unit tests added for SQLite durability settings and MockTransport behavior.
 - Desktop GitHub Actions workflow added.
+- Added normalized inbound event model and deterministic fingerprinting.
+- Added persistent `inbound_events`, `event_journal`, and `agent_runs` tables.
+- Added atomic inbound admission transaction with fingerprint dedupe and one primary AgentRun per admitted event.
+- Added per-account/conversation async serialization locks.
+- Added first durable runtime path: receive -> normalize -> serialize -> admit -> create run.
+- Added unit tests for duplicate inbound admission, AgentRun creation, runtime processing, and conversation serialization.
+- Desktop Tests run #21 passed and Conformance run #47 passed on the v0.2 stacked PR.
 
 ## In progress
 
-- Validate Desktop v0.2 bootstrap in CI.
-- Next: add normalized inbound admission + fingerprint dedupe + primary AgentRun creation.
+- Add AgentRun restoration and legal status transitions.
+- Add persistent Outbox table/repository and send-result recording.
+- Add a minimal mock decision/execution path before NapCat.
 
 ## Not started
 
@@ -106,12 +114,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Run Desktop Tests + Conformance CI on the v0.2 stacked PR and fix failures.
-2. Add persistent `inbound_events` and `agent_runs` tables.
-3. Implement event fingerprint dedupe admission transaction.
-4. Add per-conversation lock manager.
-5. Add minimal runtime flow: receive -> normalize -> admit -> create/restore run.
-6. Add NapCat/OneBot only after this core path passes tests.
+1. Add AgentRun repository with restore/load and validated state transitions.
+2. Add persistent Outbox table with unique `(account_id, dedupe_key)` and `SENDING_UNKNOWN` support.
+3. Add send executor that records PENDING -> SENDING -> SENT/FAILED/UNKNOWN transitions.
+4. Add MockTransport reconciliation test for ambiguous sends.
+5. Add minimal mock decision/action path to drive one admitted run to a durable reply.
+6. Add NapCat/OneBot only after the durable mock end-to-end path passes tests.
 
 ## Resume rule
 
