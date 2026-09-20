@@ -1,5 +1,6 @@
 package dev.qbot.android.runtime
 
+import android.app.Application
 import android.content.Context
 import androidx.room.Room
 import dev.qbot.android.data.AgentRunRepository
@@ -30,7 +31,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [37])
+@Config(sdk = [37], application = Application::class)
 class AndroidCoreRoomIntegrationTest {
     private lateinit var context: Context
     private lateinit var database: QbotDatabase
