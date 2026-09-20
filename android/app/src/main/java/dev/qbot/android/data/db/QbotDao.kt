@@ -198,6 +198,20 @@ interface QbotDao {
     @Query(
         """
         SELECT * FROM event_journal
+        WHERE related_id = :relatedId
+          AND event_type = :eventType
+        ORDER BY occurred_at DESC, journal_id DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun latestJournalForRelated(
+        relatedId: String,
+        eventType: String,
+    ): JournalEntity?
+
+    @Query(
+        """
+        SELECT * FROM event_journal
         WHERE (:runId IS NULL OR run_id = :runId)
         ORDER BY occurred_at, journal_id
         LIMIT :limit

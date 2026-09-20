@@ -19,6 +19,7 @@
         "ACTION_REJECTED",
         "POLICY_DECIDED",
         "OUTBOX_CREATED",
+        "SEND_STARTED",
         "MESSAGE_SENT",
         "SEND_UNKNOWN",
         "CHECKPOINT_COMMITTED",

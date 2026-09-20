@@ -9,11 +9,12 @@ import androidx.work.WorkerParameters
 import dev.qbot.android.data.AgentRunRepository
 import dev.qbot.android.data.OutboxRepository
 import dev.qbot.android.data.db.QbotDatabaseProvider
-import dev.qbot.android.runtime.RecoveryExecutor
 import dev.qbot.android.runtime.RecoveryMode
 import dev.qbot.android.runtime.RecoveryOutcome
-import dev.qbot.android.runtime.RecoveryPlanner
+import dev.qbot.android.runtime.RoutedRecoveryExecutor
+import dev.qbot.android.runtime.RoutedRecoveryPlanner
 import dev.qbot.android.transport.notification.NotificationTransportProvider
+import dev.qbot.android.transport.routing.AndroidTransportRegistryProvider
 
 class StartupRecoveryWorker(
     appContext: Context,
@@ -21,22 +22,28 @@ class StartupRecoveryWorker(
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         val database = QbotDatabaseProvider.get(applicationContext)
-        val transport =
+        val notification =
             NotificationTransportProvider.get(applicationContext)
+        val registry =
+            AndroidTransportRegistryProvider.get(applicationContext)
 
         return try {
-            transport.start()
+            // Standard notification transport is process-local and can always
+            // be started by Qbot. Accessibility lifecycle remains owned by
+            // AccessibilityService; the registry simply observes its snapshot.
+            notification.start()
+
             val runs = AgentRunRepository(database.qbotDao())
             val outbox = OutboxRepository(database)
-            val executor = RecoveryExecutor(
-                planner = RecoveryPlanner(
+            val executor = RoutedRecoveryExecutor(
+                planner = RoutedRecoveryPlanner(
                     runs = runs,
                     outbox = outbox,
-                    transport = transport,
+                    registry = registry,
                 ),
                 runs = runs,
                 outbox = outbox,
-                transport = transport,
+                registry = registry,
             )
             val report = executor.run(RecoveryMode.ASSIST)
 

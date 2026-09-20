@@ -83,6 +83,10 @@ class SendExecutorRoomTest {
             assertEquals("SENDING_UNKNOWN", uncertain.status)
             assertEquals(1, uncertain.transportAttempts)
             assertNotNull(uncertain.platformMessageId)
+            assertEquals(
+                "fake",
+                outbox.lastAttemptTransportId(effect.outboxId),
+            )
 
             val reconciled = sender.reconcile(effect.outboxId)
             assertEquals("SENT", reconciled.status)

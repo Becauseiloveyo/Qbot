@@ -91,6 +91,8 @@ Required columns:
 
 The journal is append-only in normal operation. Runtime code must not rewrite prior journal history to make a failed action appear successful.
 
+For routed external effects, `SEND_STARTED` records the selected stable `transport_id` with `related_id = outbox_id`. This event is the durable source of truth for which adapter owned an external attempt if the process dies before the result is committed.
+
 Recommended indexes:
 
 - `(conversation_id, occurred_at)`
@@ -257,9 +259,9 @@ The transaction that creates an authoritative reply effect must insert the Outbo
 
 Recovery rules:
 
-- `PENDING`: eligible to send after policy/writer checks.
+- `PENDING`: eligible to send after policy/writer checks; adapter fallback is allowed only while the effect remains PENDING.
 - `SENDING`: after crash, convert to `SENDING_UNKNOWN` unless transport semantics prove no external write occurred.
-- `SENDING_UNKNOWN`: reconcile before retry when `DELIVERY_LOOKUP` or history lookup exists.
+- `SENDING_UNKNOWN`: reconcile only through the adapter recorded by the latest `SEND_STARTED.transport_id`; another adapter must not perform lookup or replay the effect.
 - `SENT`: never automatically resend.
 
 ## memories
@@ -361,6 +363,17 @@ Single transaction:
 
 Network transmission happens after commit.
 
+### Send attempt start
+
+Before invoking one selected external adapter, a single transaction:
+
+1. validates the Outbox effect is still `PENDING`;
+2. transitions it to `SENDING`;
+3. increments `transport_attempts`;
+4. appends `SEND_STARTED` with the selected stable `transport_id` and `related_id = outbox_id`.
+
+The external adapter call occurs only after this transaction commits. Once this boundary is crossed, automatic fallback to a different adapter is forbidden. If the result is ambiguous, the effect becomes `SENDING_UNKNOWN` and recovery uses only the recorded original adapter.
+
 ## Android Room mapping
 
 - Entity primary keys mirror logical primary keys above.
@@ -388,4 +401,5 @@ Both runtimes must eventually prove:
 4. stale Task `version` -> authoritative mutation rejected;
 5. task checkpoint survives process/runtime restart;
 6. `SENDING_UNKNOWN` does not blindly resend when reconciliation is available;
-7. contact-originated memory cannot mutate System Policy directly.
+7. contact-originated memory cannot mutate System Policy directly;
+8. a routed send persists the selected adapter before the external call, and `SENDING_UNKNOWN` cannot reconcile through a different adapter.

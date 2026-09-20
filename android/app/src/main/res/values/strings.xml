@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Qbot</string>
     <string name="notification_listener_label">Qbot QQ notification access</string>
+    <string name="accessibility_service_label">Qbot QQ enhanced accessibility</string>
+    <string name="accessibility_service_description">Optional enhanced QQ/TIM UI access. Qbot only enables a send capability when the current conversation and reply controls are positively recognized.</string>
 </resources>
