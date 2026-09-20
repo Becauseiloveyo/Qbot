@@ -86,7 +86,7 @@ class RoutedSendExecutorRoomTest {
             )
 
             val standard = ProbeTransport(
-                adapterName = "notification",
+                adapterName = "probe-standard",
                 readiness = SendReadiness(
                     SendAvailability.TEMPORARILY_UNAVAILABLE,
                     "no live RemoteInput",
@@ -94,7 +94,7 @@ class RoutedSendExecutorRoomTest {
                 result = SendResult(accepted = true),
             )
             val accessibility = ProbeTransport(
-                adapterName = "accessibility",
+                adapterName = "probe-accessibility",
                 readiness = SendReadiness(SendAvailability.READY),
                 result = SendResult(
                     accepted = true,
@@ -153,7 +153,7 @@ class RoutedSendExecutorRoomTest {
             )
 
             val primary = ProbeTransport(
-                adapterName = "accessibility",
+                adapterName = "probe-primary",
                 readiness = SendReadiness(SendAvailability.READY),
                 result = SendResult(
                     accepted = false,
@@ -163,7 +163,7 @@ class RoutedSendExecutorRoomTest {
                 ),
             )
             val secondary = ProbeTransport(
-                adapterName = "experimental",
+                adapterName = "probe-secondary",
                 readiness = SendReadiness(SendAvailability.READY),
                 result = SendResult(
                     accepted = true,
