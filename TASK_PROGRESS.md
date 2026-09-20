@@ -201,12 +201,17 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - Retrieval excludes CANDIDATE/REJECTED/SUPERSEDED records, wrong owner/conversation/task domains, future/not-yet-valid memory, expired memory, and lexical/entity-irrelevant records when the query supplies relevance signals.
 - Added deterministic Desktop retrieval tests for state/domain isolation, stable ranking, component scoring, temporal validity, explicit domain requirements, relevance fail-closed behavior, and repeatable limits.
 - ADR-021 records that FTS5/semantic backends may accelerate candidate discovery but cannot change eligibility, trust/domain boundaries, ranking semantics, or Active Task/Checkpoint force-loading.
-- Desktop Tests #495 and Conformance #521 passed on deterministic retrieval commit `6aea7f2`; Android Tests #226 is a full-branch regression run and was still in progress when this checkpoint was written.
+- Desktop Tests #495 and Conformance #521 passed on deterministic retrieval commit `6aea7f2`; Android Tests #226 later completed successfully.
+- Added Android deterministic `MemoryRetriever` parity with PROMOTED-only eligibility, explicit owner/conversation/task domain isolation, temporal validity, relevance fail-closed behavior, min-trust filtering, and the ADR-021 integer scoring weights/tie-break order.
+- Android normalization mirrors Desktop NFKC + Unicode case-fold semantics using ICU `UCharacter.foldCase`; recency and created-at ordering preserve sub-second precision rather than reducing timestamps to epoch seconds.
+- Added Android Room retrieval regression tests covering authoritative-state/domain isolation, deterministic component scores, temporal validity, relevance filtering, explicit domain requirements, min-trust filtering, stable ordering, and limits.
+- Android deterministic retrieval required no Room schema change; schema remains v2 and FTS/index persistence is still deferred until cross-runtime parity fixtures pass.
+- Latest retrieval parity checkpoint passed on `de842dc`: Android Tests #231, Desktop Tests #501, and Conformance #527 all succeeded.
 
 ## In progress
 
-- Port the frozen deterministic MemoryRetriever contract to Android with the same integer component scores, scope/domain filtering, temporal validity rules, and stable ordering.
-- Add cross-runtime parity fixtures so Desktop and Android produce the same eligible memory IDs and ordering for the same records/query.
+- Add shared cross-runtime retrieval fixtures so Desktop and Android consume the same records/query and must produce the same eligible memory IDs, score components, and ordering.
+- Extend conformance validation around the frozen ADR-021 retrieval semantics before adding backend-specific FTS acceleration.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
@@ -243,9 +248,9 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add Android deterministic MemoryRetriever parity using ADR-021 exactly: PROMOTED-only eligibility, explicit domain filters, temporal validity, integer keyword/entity/recency/importance/trust components, and identical tie-break rules.
-2. Add shared cross-runtime retrieval fixtures and extend conformance validation to assert identical eligibility/order for representative queries.
-3. Add SQLite FTS5 and Android Room FTS as candidate accelerators only after parity passes; indexed retrieval must preserve the frozen deterministic eligibility/ranking contract.
+1. Add shared cross-runtime deterministic retrieval fixtures with explicit stored memory rows, query parameters, evaluation time, expected eligible IDs/order, and expected integer score components.
+2. Make Desktop and Android retrieval tests consume the shared fixtures and extend `tools/validate_conformance.py` to validate the fixture contract independently of either runtime.
+3. Add SQLite FTS5 and Android Room FTS as candidate accelerators only after shared parity passes; indexed retrieval must preserve the frozen deterministic eligibility/ranking contract.
 4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval and FTS acceleration are stable; embeddings are never authoritative.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
 6. Add background candidate extraction/summarization only after durable staging/promotion and deterministic retrieval work independently.
