@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+
+from sqlalchemy import func, select
 from datetime import UTC, datetime
 from pathlib import Path
 
 from qbot.config import QbotConfig
+from qbot.domain.actions import ActionProposal, RiskClass
 from qbot.persistence import Database
 from qbot.persistence.admission import InboundAdmissionRepository
 from qbot.persistence.journal import JournalRepository
 from qbot.persistence.outbox import OutboxRepository
 from qbot.persistence.runs import AgentRunRepository
+from qbot.persistence.tables import outbox_messages
 from qbot.runtime import EventNormalizer
 from qbot.runtime.reply_flow import DurableReplyFlow
 from qbot.transport import IncomingTransportEvent, MockTransport
@@ -97,6 +101,71 @@ class DurableReplyFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(recovered.run_status, "SUCCEEDED")
         self.assertEqual(recovered.outbox.status, "SENT")
         self.assertEqual(recovered.outbox.transport_attempts, 1)
+
+
+    async def test_r2_send_waits_for_human_and_never_creates_outbox(self) -> None:
+        event, admitted = self._admit()
+
+        class R2Decision:
+            async def decide(self, *, run_id, event):
+                return ActionProposal(
+                    proposal_id="proposal-r2",
+                    run_id=run_id,
+                    action="SEND_MESSAGE",
+                    risk_hint=RiskClass.R2,
+                    arguments={"text": "需要确认"},
+                    source_message_ids=(),
+                )
+
+        flow = DurableReplyFlow(
+            admission=self.admission,
+            runs=self.runs,
+            outbox=self.outbox,
+            journal=JournalRepository(self.db),
+            transport=self.transport,
+            decision=R2Decision(),
+        )
+        result = await flow.execute(
+            run_id=admitted.run_id,
+            event_id=event.event_id,
+        )
+
+        self.assertEqual(result.run_status, "WAITING_USER")
+        self.assertIsNone(result.outbox)
+        with self.db.engine.connect() as conn:
+            count = conn.execute(
+                select(func.count()).select_from(outbox_messages)
+            ).scalar_one()
+        self.assertEqual(count, 0)
+
+    async def test_request_human_is_elevated_even_if_model_marks_r0(self) -> None:
+        event, admitted = self._admit()
+
+        class HumanDecision:
+            async def decide(self, *, run_id, event):
+                return ActionProposal(
+                    proposal_id="proposal-human",
+                    run_id=run_id,
+                    action="REQUEST_HUMAN",
+                    risk_hint=RiskClass.R0,
+                    arguments={},
+                    source_message_ids=(),
+                )
+
+        flow = DurableReplyFlow(
+            admission=self.admission,
+            runs=self.runs,
+            outbox=self.outbox,
+            journal=JournalRepository(self.db),
+            transport=self.transport,
+            decision=HumanDecision(),
+        )
+        result = await flow.execute(
+            run_id=admitted.run_id,
+            event_id=event.event_id,
+        )
+        self.assertEqual(result.run_status, "WAITING_USER")
+        self.assertIsNone(result.outbox)
 
 
 if __name__ == "__main__":
