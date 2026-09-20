@@ -12,6 +12,8 @@ from .onebot import (
     OneBotForwardWsTransport,
     OneBotProtocolError,
     OneBotTransportConfig,
+    TransportHealth,
+    TransportHealthState,
 )
 
 __all__ = [
@@ -22,6 +24,8 @@ __all__ = [
     "OneBotForwardWsTransport",
     "OneBotProtocolError",
     "OneBotTransportConfig",
+    "TransportHealth",
+    "TransportHealthState",
     "OutgoingMessage",
     "QQTransport",
     "SendResult",
