@@ -112,3 +112,12 @@ Reason: cross-platform correctness depends on invariant equivalence, not code re
 Decision: the NotificationListener standard adapter treats QQ/TIM notification-derived account/conversation identifiers as local aliases with explicit identity-quality metadata, never as canonical QQ UINs. Shortcut/locus identifiers are preferred; title fallback is scoped to the notification slot to avoid merging same-name contacts. RemoteInput/PendingIntent reply actions are process-local ephemeral capabilities: they are cleared on listener disconnect, transport stop, notification removal, or an update that no longer exposes RemoteInput. They are never persisted. The notification transport does not advertise DELIVERY_LOOKUP.
 
 Reason: Android notification APIs do not guarantee canonical QQ identity or durable delivery history. Conservatively losing reply availability is safer than misrouting a reply or blindly replaying an ambiguous external send.
+
+
+## ADR-019 — Enhanced Android transports negotiate capability before Outbox send
+
+Decision: Android v0.6 introduces common adapter tier/health/capability snapshots and deterministic send selection. Fallback is permitted only while an Outbox effect is still PENDING and before any external adapter attempt. Once the selected adapter enters the durable SENDING boundary, Qbot never automatically tries another adapter for that effect; ambiguous results remain SENDING_UNKNOWN and require reconciliation/manual review.
+
+Accessibility is an optional QQ UI adapter whose SEND_TEXT/READ_TEXT capabilities are advertised only while the relevant QQ/TIM UI is positively recognized. Unknown layouts fail closed. Shizuku is modeled separately as an optional privileged system-capability provider; Shizuku READY does not imply any QQTransport capability. Experimental/root/hook transports remain a separate tier.
+
+Reason: Accessibility UI automation is layout-sensitive, Shizuku grants system-level execution context rather than QQ semantic access, and cross-adapter retry after an ambiguous effect would violate Qbot's effectively-once Outbox invariant.
