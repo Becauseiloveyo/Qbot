@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.3 — LLM + Persona + Context
+Current milestone: v0.4 — Durable Recovery + Policy
 Current branch: `feature/desktop-v0.3-agent-context`
 
 ## Current objective
 
-Finish v0.3 model-facing integration on top of durable state: persist/select Persona/Contact profiles, connect the SQLite-backed ContextSource to the runtime opt-in LLM decision path, and keep real OneBot operation observe-only until explicit automation policy is configured.
+Complete v0.4 recovery/operations guarantees: startup recovery of unfinished runs/outbox effects, full task-step checkpoint commits, journal inspection, backup/migration/Safe Mode, and reconciliation workflows.
 
 ## Completed
 
@@ -109,17 +109,25 @@ Finish v0.3 model-facing integration on top of durable state: persist/select Per
 - Added a regression test that updates Task version/checkpoint between two decisions and proves the second prompt contains only the new checkpoint state.
 - After fixes, Desktop Tests #127 / Conformance #153 passed for async decision integration; Desktop Tests #137 / Conformance #163 passed for SQLite-backed Task/Checkpoint context reload.
 
+- Added persistent Persona and ContactProfile tables, default Persona selection, per-contact Persona override, and versioned updates; Desktop DB schema is now version 3.
+- `DurableSqliteContextSource` reloads Persona, ContactProfile, active Task, matching Checkpoint, important decisions, and recent messages on every decision.
+- Added role-based runtime-only LLM environment configuration for decision/chat/summary/memory with role-specific overrides and non-persisted API keys.
+- Added explicit `--agent-mode observe|assist`; default is `observe`, while `assist` wires SQLite context + LLM DecisionEngine through existing Policy + Outbox.
+- `REQUEST_HUMAN` is deterministically elevated to R2/REQUIRE_HUMAN even if the model labels it R0.
+- Added tests proving R2 actions enter `WAITING_USER` and create zero Outbox effects.
+- Added full restart/context-reset integration test: process closes DB/runtime, Task advances to a new version/checkpoint, fresh ContextSource/ModelRouter/model objects are created, and the next reply uses only the new durable state through LLM -> Policy -> Outbox.
+- Conformance #190 / Desktop Tests #164 passed for persona/env/assist gating; Conformance #192 / Desktop Tests #166 passed for the full context-reset durable continuation path.
+- v0.3 roadmap deliverables are complete.
+
 ## In progress
 
-- Persist Persona / ContactProfile selection instead of using only constructor-provided profiles.
-- Add explicit runtime configuration for LLM provider roles without persisting API keys.
-- Wire `ContextualLlmDecisionEngine` into Desktop runtime behind an explicit opt-in mode; default OneBot mode remains observe-only.
+- Start startup recovery for unfinished AgentRuns and Outbox records.
+- Add deterministic recovery planning before any replayed side effect.
 
 ## Not started
 
 - Android application skeleton.
 - Android QQ transport adapters.
-- LLM router.
 - Persona/contact UI.
 - Memory retrieval implementation.
 - Coordinator and phone/PC synchronization.
@@ -150,12 +158,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add persistent Persona and ContactProfile storage + selection for ContextSource.
-2. Add runtime-only LLM environment configuration (base URL, model, API key) mapped to decision/chat/summary/memory roles.
-3. Add an explicit `--agent-mode observe|assist` gate; OneBot defaults to `observe`, and LLM-generated sends are not enabled implicitly.
-4. Wire the SQLite-backed ContextSource + LLM DecisionEngine into `assist` mode through the existing Policy + Outbox path.
-5. Add tests that R2 actions enter `WAITING_USER` and cannot reach Outbox automatically.
-6. Add integration test: persisted Task/Checkpoint -> LLM ActionProposal -> Policy -> Outbox, proving a context reset still continues the task correctly.
+1. Create v0.4 implementation branch from the fully tested v0.3 head.
+2. Add startup RecoveryPlanner for non-terminal AgentRuns and PENDING/SENDING/SENDING_UNKNOWN Outbox rows.
+3. Never blindly replay `SENDING_UNKNOWN`; reconcile only when transport capability permits, otherwise surface manual recovery state.
+4. Add full TaskStep + Checkpoint commit repository with optimistic task version / writer-epoch checks.
+5. Add read-only event journal inspection CLI.
+6. Add backup -> migration -> integrity check -> Safe Mode bootstrap flow and tests.
+7. Add crash-injection recovery tests before moving to Android v0.5.
 
 ## Resume rule
 
