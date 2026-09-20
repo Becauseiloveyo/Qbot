@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from qbot.config import QbotConfig
 from qbot.persistence import Database
 from qbot.runtime import DesktopCore
+from qbot.runtime.decision import DecisionEngine
 from qbot.transport import MockTransport, QQTransport
 
 
@@ -27,6 +28,7 @@ class DesktopRuntime:
 def build_runtime(
     config: QbotConfig | None = None,
     transport: QQTransport | None = None,
+    decision: DecisionEngine | None = None,
 ) -> DesktopRuntime:
     resolved = config or QbotConfig()
     database = Database(resolved)
@@ -35,5 +37,5 @@ def build_runtime(
         config=resolved,
         database=database,
         transport=resolved_transport,
-        core=DesktopCore(database, resolved_transport),
+        core=DesktopCore(database, resolved_transport, decision=decision),
     )
