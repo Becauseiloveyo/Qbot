@@ -48,12 +48,14 @@ Finish the common contracts and conformance rules that both Android and Desktop 
   - durable task restore before reasoning;
   - ambiguous external send reconciliation without blind replay.
 - All current JSON schema/fixture files were parsed successfully as valid JSON.
+- Executable conformance validator added with JSON Schema Draft 2020-12 checks and cross-record invariants.
+- GitHub Actions conformance workflow added for Python 3.12.
 
 ## In progress
 
 - Tighten cross-schema invariants that JSON Schema alone does not express.
-- Add executable conformance validation tooling.
 - Define v0.1 persistence mapping so Android Room and Desktop SQLite use equivalent semantics.
+- Expand executable invariant coverage beyond the first two conformance fixtures.
 
 ## Not started
 
@@ -92,9 +94,9 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add executable v0.1 conformance validator.
-2. Add persistence mapping document for Room and Desktop SQLite.
-3. Add journal/idempotency invariant tests.
+1. Add persistence mapping document for Room and Desktop SQLite.
+2. Add journal/idempotency invariant tests.
+3. Run the conformance validator in CI and fix any schema/invariant failures.
 4. When v0.1 contracts pass, begin Desktop v0.2 runtime skeleton.
 
 ## Resume rule
