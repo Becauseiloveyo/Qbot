@@ -41,6 +41,12 @@ inbound_events = Table(
     Column("received_at", String, nullable=False),
     Column("raw_ref", String),
     Column("metadata_json", Text, nullable=False, default="{}"),
+    UniqueConstraint(
+        "account_id",
+        "conversation_id",
+        "event_id",
+        name="uq_inbound_event_identity",
+    ),
 )
 
 agent_runs = Table(
@@ -64,6 +70,33 @@ agent_runs = Table(
     Column("updated_at", String, nullable=False),
 )
 
+outbox_messages = Table(
+    "outbox_messages",
+    metadata,
+    Column("outbox_id", String, primary_key=True),
+    Column("schema_version", String, nullable=False),
+    Column("run_id", String, ForeignKey("agent_runs.run_id"), nullable=False),
+    Column("account_id", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("dedupe_key", String, nullable=False),
+    Column("status", String, nullable=False),
+    Column("payload_kind", String, nullable=False),
+    Column("payload_text", Text),
+    Column("content_ref", String),
+    Column("reply_to_message_id", String),
+    Column("platform_message_id", String),
+    Column("transport_attempts", Integer, nullable=False, default=0),
+    Column("last_error", Text),
+    Column("writer_epoch", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False),
+    Column("sent_at", String),
+    UniqueConstraint(
+        "account_id",
+        "dedupe_key",
+        name="uq_outbox_account_dedupe",
+    ),
+)
+
 event_journal = Table(
     "event_journal",
     metadata,
@@ -78,11 +111,4 @@ event_journal = Table(
     Column("related_id", String),
     Column("payload_json", Text, nullable=False, default="{}"),
     Column("occurred_at", String, nullable=False),
-)
-
-UniqueConstraint(
-    inbound_events.c.account_id,
-    inbound_events.c.conversation_id,
-    inbound_events.c.event_id,
-    name="uq_inbound_event_identity",
 )
