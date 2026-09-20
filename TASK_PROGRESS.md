@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.2 — Desktop Transport + Runtime Skeleton
+Current milestone: v0.3 — LLM + Persona + Context
 Current branch: `feature/desktop-v0.2-runtime`
 
 ## Current objective
 
-Turn the now-tested Desktop core + OneBot adapter into a runnable Desktop service: startup/config entrypoint, reconnect/health behavior, and NapCat live diagnostics before adding real LLM/persona logic.
+Build the model-facing layer without weakening durable-state guarantees: provider/router abstraction, Persona + Contact profiles, ContextBuilder with token budgets, and structured ActionProposal generation.
 
 ## Completed
 
@@ -81,17 +81,24 @@ Turn the now-tested Desktop core + OneBot adapter into a runnable Desktop servic
 - Added fake-WebSocket tests proving event/API multiplexing, token header behavior, API response correlation, and timeout -> uncertain-delivery semantics.
 - Desktop Tests #61 and Conformance #87 passed after OneBot transport integration.
 - Added `docs/DESKTOP_NAPCAT.md` with current NapCat forward-WS setup and safety constraints.
+- Added installable `qbot-desktop` CLI with explicit mock/onebot transport selection.
+- OneBot token is read only from `QBOT_ONEBOT_TOKEN` at runtime; it is not persisted in normal config.
+- Added OneBot connection supervisor with health states and exponential reconnect backoff.
+- Added read-only NapCat diagnostic path using OneBot `get_status` and `get_version_info`; diagnostic does not send chat messages.
+- Added structured OneBot connect/disconnect logging.
+- Added tests for token header, event/API multiplexing, timeout uncertainty, read-only diagnostics, and actual reconnect to a second fake connection.
+- Conformance #101 and Desktop Tests #75 passed after CLI/reconnect/diagnostic integration.
+- v0.2 implementation is complete enough for v0.3; real NapCat live verification remains an environment check on a machine running QQ/NapCat.
 
 ## In progress
 
-- Add runnable Desktop entrypoint and transport selection.
-- Add OneBot reconnect/health behavior suitable for long-running use.
-- Add NapCat live diagnostic mode without enabling unrestricted auto-reply.
+- Start v0.3 LLM provider/router abstraction.
+- Add Persona + Contact profile models.
+- Add ContextBuilder that always restores Task/Checkpoint before model invocation.
+- Add token-budget trimming rules with task/checkpoint priority.
 
 ## Not started
 
-- Desktop runtime implementation.
-- NapCat/OneBot transport.
 - Android application skeleton.
 - Android QQ transport adapters.
 - LLM router.
@@ -125,12 +132,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add `qbot-desktop` CLI / startup entrypoint with explicit `mock` vs `onebot` transport selection.
-2. Keep OneBot token runtime-only (environment / future OS credential store), never persisted to normal config.
-3. Add reconnect/backoff and transport-health reporting for OneBot connection loss.
-4. Add a diagnostic mode that connects to NapCat and validates event/API connectivity without enabling general autonomous replies.
-5. Add structured logging around admission, AgentRun, Outbox, send uncertainty, and reconnection.
-6. After the runnable Desktop service is stable, begin v0.3 LLM Router + Persona + ContextBuilder.
+1. Create v0.3 implementation branch from the tested v0.2 head.
+2. Add provider-neutral LLM request/response interface and deterministic MockLLM.
+3. Add model router with role-specific profiles: decision, chat, summary, memory.
+4. Add Persona and ContactProfile models with stable-prefix rendering.
+5. Add ContextBuilder + TokenBudget that always preserves System/Persona/Active Task/Checkpoint/Current Message before optional history.
+6. Add tests proving short context windows still retain task/checkpoint continuity.
+7. Only after the model-facing contracts are deterministic, add an OpenAI-compatible HTTP provider.
 
 ## Resume rule
 
