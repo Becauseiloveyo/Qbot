@@ -168,3 +168,27 @@ task_checkpoints = Table(
     Column("writer_epoch", Integer, nullable=False, default=0),
     Column("created_at", String, nullable=False),
 )
+
+
+personas = Table(
+    "personas",
+    metadata,
+    Column("persona_id", String, primary_key=True),
+    Column("identity_summary", Text, nullable=False, default=""),
+    Column("style_rules_json", Text, nullable=False, default="[]"),
+    Column("hard_constraints_json", Text, nullable=False, default="[]"),
+    Column("version", Integer, nullable=False, default=1),
+    Column("updated_at", String, nullable=False),
+)
+
+contact_profiles = Table(
+    "contact_profiles",
+    metadata,
+    Column("contact_id", String, primary_key=True),
+    Column("relation", Text, nullable=False, default=""),
+    Column("stable_facts_json", Text, nullable=False, default="[]"),
+    Column("style_overrides_json", Text, nullable=False, default="[]"),
+    Column("persona_id", String, ForeignKey("personas.persona_id")),
+    Column("version", Integer, nullable=False, default=1),
+    Column("updated_at", String, nullable=False),
+)
