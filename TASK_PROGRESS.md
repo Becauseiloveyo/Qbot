@@ -7,7 +7,7 @@ Current branch: `feature/desktop-v0.2-runtime`
 
 ## Current objective
 
-Complete the durable Desktop core before NapCat integration: restore/progress AgentRuns, add Outbox persistence and send-result recording, then layer a mock reasoning/execution path on top.
+Turn the now-tested Desktop core + OneBot adapter into a runnable Desktop service: startup/config entrypoint, reconnect/health behavior, and NapCat live diagnostics before adding real LLM/persona logic.
 
 ## Completed
 
@@ -70,12 +70,23 @@ Complete the durable Desktop core before NapCat integration: restore/progress Ag
 - Added first durable runtime path: receive -> normalize -> serialize -> admit -> create run.
 - Added unit tests for duplicate inbound admission, AgentRun creation, runtime processing, and conversation serialization.
 - Desktop Tests run #21 passed and Conformance run #47 passed on the v0.2 stacked PR.
+- Added AgentRun repository with durable restore/load and validated state transitions.
+- Added persistent Outbox with unique `(account_id, dedupe_key)`, PENDING/SENDING/SENT/FAILED/SENDING_UNKNOWN transitions, and journal writes.
+- Added SendExecutor plus MockTransport ambiguous-delivery reconciliation; a delivered-but-unacknowledged message is reconciled without resend.
+- Added deterministic ActionProposal + R0-R3 policy gate and a durable mock reply flow.
+- DesktopCore can now drive an admitted event through restore -> reasoning -> policy -> Outbox -> transport -> SENT -> AgentRun SUCCEEDED.
+- Durable reply and ambiguous recovery tests passed; Desktop Tests #50 and Conformance #76 were successful.
+- Added NapCat/OneBot v11 forward WebSocket adapter using the combined `/` endpoint, `echo` request correlation, private/group mapping, Bearer token support, and literal-text `auto_escape=true` sends.
+- OneBot adapter intentionally does not advertise DELIVERY_LOOKUP yet, so uncertain sends are never blindly retried.
+- Added fake-WebSocket tests proving event/API multiplexing, token header behavior, API response correlation, and timeout -> uncertain-delivery semantics.
+- Desktop Tests #61 and Conformance #87 passed after OneBot transport integration.
+- Added `docs/DESKTOP_NAPCAT.md` with current NapCat forward-WS setup and safety constraints.
 
 ## In progress
 
-- Add AgentRun restoration and legal status transitions.
-- Add persistent Outbox table/repository and send-result recording.
-- Add a minimal mock decision/execution path before NapCat.
+- Add runnable Desktop entrypoint and transport selection.
+- Add OneBot reconnect/health behavior suitable for long-running use.
+- Add NapCat live diagnostic mode without enabling unrestricted auto-reply.
 
 ## Not started
 
@@ -114,12 +125,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add AgentRun repository with restore/load and validated state transitions.
-2. Add persistent Outbox table with unique `(account_id, dedupe_key)` and `SENDING_UNKNOWN` support.
-3. Add send executor that records PENDING -> SENDING -> SENT/FAILED/UNKNOWN transitions.
-4. Add MockTransport reconciliation test for ambiguous sends.
-5. Add minimal mock decision/action path to drive one admitted run to a durable reply.
-6. Add NapCat/OneBot only after the durable mock end-to-end path passes tests.
+1. Add `qbot-desktop` CLI / startup entrypoint with explicit `mock` vs `onebot` transport selection.
+2. Keep OneBot token runtime-only (environment / future OS credential store), never persisted to normal config.
+3. Add reconnect/backoff and transport-health reporting for OneBot connection loss.
+4. Add a diagnostic mode that connects to NapCat and validates event/API connectivity without enabling general autonomous replies.
+5. Add structured logging around admission, AgentRun, Outbox, send uncertainty, and reconnection.
+6. After the runnable Desktop service is stable, begin v0.3 LLM Router + Persona + ContextBuilder.
 
 ## Resume rule
 
