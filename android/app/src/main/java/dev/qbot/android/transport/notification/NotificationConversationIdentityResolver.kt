@@ -1,6 +1,7 @@
 package dev.qbot.android.transport.notification
 
 import android.app.Notification
+import android.os.Build
 import android.service.notification.StatusBarNotification
 import java.security.MessageDigest
 
@@ -32,17 +33,19 @@ class NotificationConversationIdentityResolver {
                 )
             }
 
-        notification.locusId
-            ?.id
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { locusId ->
-                return resolved(
-                    packageName = packageName,
-                    quality = ConversationIdentityQuality.APP_LOCUS,
-                    material = locusId,
-                )
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            notification.locusId
+                ?.id
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { locusId ->
+                    return resolved(
+                        packageName = packageName,
+                        quality = ConversationIdentityQuality.APP_LOCUS,
+                        material = locusId,
+                    )
+                }
+        }
 
         notification.extras
             .getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
