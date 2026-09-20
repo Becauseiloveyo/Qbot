@@ -28,6 +28,14 @@ class CliTests(unittest.TestCase):
     def test_assist_mode_requires_explicit_selection(self) -> None:
         args = _parser().parse_args(["run", "--agent-mode", "assist"])
         self.assertEqual(args.agent_mode, "assist")
+    def test_journal_parser_is_read_only_surface(self) -> None:
+        args = _parser().parse_args(
+            ["journal", "--db", "qbot.db", "--run-id", "run-1", "--json"]
+        )
+        self.assertEqual(args.command, "journal")
+        self.assertEqual(args.run_id, "run-1")
+        self.assertTrue(args.json)
+
 
 if __name__ == "__main__":
     unittest.main()
