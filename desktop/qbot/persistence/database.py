@@ -4,20 +4,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-from sqlalchemy import Column, MetaData, String, Table, create_engine, event, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Connection, Engine
 
 from qbot.config import QbotConfig
 
-
-metadata = MetaData()
-
-qbot_meta = Table(
-    "qbot_meta",
-    metadata,
-    Column("key", String, primary_key=True),
-    Column("value", String, nullable=False),
-)
+from .tables import metadata, qbot_meta
 
 
 class Database:
@@ -50,11 +42,7 @@ class Database:
                 cursor.close()
 
     def bootstrap(self) -> None:
-        """Create v0.2 bootstrap metadata and enable WAL mode.
-
-        WAL is a database-level setting and is established before runtime work.
-        Foreign-key enforcement is installed on every SQLAlchemy connection.
-        """
+        """Create v0.2 tables and enable WAL mode."""
 
         with self.engine.begin() as conn:
             mode = conn.execute(text("PRAGMA journal_mode=WAL")).scalar_one()
@@ -97,8 +85,9 @@ class Database:
     def meta(self, key: str) -> str | None:
         with self.engine.connect() as conn:
             return conn.execute(
-                text("SELECT value FROM qbot_meta WHERE key=:key"),
-                {"key": key},
+                qbot_meta.select()
+                .with_only_columns(qbot_meta.c.value)
+                .where(qbot_meta.c.key == key)
             ).scalar_one_or_none()
 
     def close(self) -> None:
