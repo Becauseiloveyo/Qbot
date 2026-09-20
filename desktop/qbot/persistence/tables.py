@@ -112,3 +112,59 @@ event_journal = Table(
     Column("payload_json", Text, nullable=False, default="{}"),
     Column("occurred_at", String, nullable=False),
 )
+
+
+tasks = Table(
+    "tasks",
+    metadata,
+    Column("task_id", String, primary_key=True),
+    Column("schema_version", String, nullable=False),
+    Column("conversation_id", String, nullable=False),
+    Column("parent_task_id", String),
+    Column("goal", Text, nullable=False),
+    Column("status", String, nullable=False),
+    Column("phase", String, nullable=False),
+    Column("constraints_json", Text, nullable=False, default="[]"),
+    Column("decisions_json", Text, nullable=False, default="[]"),
+    Column("blockers_json", Text, nullable=False, default="[]"),
+    Column("next_action", Text),
+    Column("writer_epoch", Integer, nullable=False, default=0),
+    Column("version", Integer, nullable=False),
+    Column("created_at", String, nullable=False),
+    Column("updated_at", String, nullable=False),
+)
+
+task_steps = Table(
+    "task_steps",
+    metadata,
+    Column("step_id", String, primary_key=True),
+    Column("task_id", String, ForeignKey("tasks.task_id"), nullable=False),
+    Column("sequence", Integer, nullable=False),
+    Column("description", Text, nullable=False),
+    Column("status", String, nullable=False),
+    Column("result", Text),
+    Column("error", Text),
+    Column("started_at", String),
+    Column("completed_at", String),
+    UniqueConstraint("task_id", "sequence", name="uq_task_step_sequence"),
+)
+
+task_checkpoints = Table(
+    "task_checkpoints",
+    metadata,
+    Column("checkpoint_id", String, primary_key=True),
+    Column("schema_version", String, nullable=False),
+    Column("task_id", String, ForeignKey("tasks.task_id"), nullable=False),
+    Column("agent_run_id", String),
+    Column("task_version", Integer, nullable=False),
+    Column("summary", Text, nullable=False),
+    Column("completed_step_ids_json", Text, nullable=False, default="[]"),
+    Column("pending_step_ids_json", Text, nullable=False, default="[]"),
+    Column("current_step_id", String),
+    Column("decisions_json", Text, nullable=False, default="[]"),
+    Column("blockers_json", Text, nullable=False, default="[]"),
+    Column("next_action", Text),
+    Column("context_digest", String),
+    Column("writer_epoch", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False),
+)
