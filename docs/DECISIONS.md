@@ -85,3 +85,16 @@ Reason: provider credentials are not agent memory or application state and shoul
 Decision: startup recovery first converts crash-left `SENDING` effects to `SENDING_UNKNOWN`, then builds a deterministic RecoveryPlan. Unknown delivery is reconciled only when the transport advertises `DELIVERY_LOOKUP`; otherwise it requires manual review. A locally `SENT` effect may finalize an interrupted AgentRun without resending.
 
 Reason: restart recovery must distinguish safe local repair from potentially duplicated external side effects.
+
+
+## ADR-015 — Database startup is backup/migrate/verify or Safe Mode
+
+Decision: Desktop persistence performs an explicit schema-version check. An older known schema is backed up with SQLite's online backup API before a contiguous registered migration runs; the migrated database must pass `PRAGMA integrity_check`, `foreign_key_check`, and required-table validation. Unknown/newer schemas or failed validation enter Safe Mode.
+
+Reason: schema drift or a failed migration must never be hidden by `create_all` or by overwriting the stored schema version.
+
+## ADR-016 — Safe Mode starts no messaging transport
+
+Decision: when database bootstrap enters Safe Mode, Desktop Runtime does not start QQ transport and does not execute startup recovery. Read-only journal/diagnostic operations and consistent database snapshot export remain available.
+
+Reason: inspection and recovery must remain possible without allowing task execution or external side effects against an untrusted database state.
