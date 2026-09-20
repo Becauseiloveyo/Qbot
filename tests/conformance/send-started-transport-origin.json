@@ -1,0 +1,62 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "send attempt records original transport before uncertain outcome",
+  "given": {
+    "journal_events": [
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-outbox",
+        "event_type": "OUTBOX_CREATED",
+        "actor": "SYSTEM",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": null,
+        "run_id": "run-1",
+        "related_id": "out-1",
+        "payload": {
+          "dedupe_key": "run-1:reply"
+        },
+        "occurred_at": "2026-09-20T14:10:00Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-send-started",
+        "event_type": "SEND_STARTED",
+        "actor": "TRANSPORT",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": null,
+        "run_id": "run-1",
+        "related_id": "out-1",
+        "payload": {
+          "transport_id": "android-accessibility"
+        },
+        "occurred_at": "2026-09-20T14:10:01Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "journal_id": "j-send-unknown",
+        "event_type": "SEND_UNKNOWN",
+        "actor": "TRANSPORT",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "task_id": null,
+        "run_id": "run-1",
+        "related_id": "out-1",
+        "payload": {
+          "platform_message_id": null
+        },
+        "occurred_at": "2026-09-20T14:10:02Z"
+      }
+    ]
+  },
+  "expect": {
+    "journal_ids_unique": true,
+    "chronological": true,
+    "required_order": [
+      "OUTBOX_CREATED",
+      "SEND_STARTED",
+      "SEND_UNKNOWN"
+    ]
+  }
+}
