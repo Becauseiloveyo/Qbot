@@ -17,6 +17,9 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 enum class NotificationTransportHealth {
     STOPPED,
@@ -45,8 +48,15 @@ class NotificationQQTransport(
     @Volatile
     private var started = false
 
-    @Volatile
-    private var listenerConnected = false
+    private val _listenerConnected = MutableStateFlow(false)
+    val listenerConnected: StateFlow<Boolean> =
+        _listenerConnected.asStateFlow()
+
+    private val _health = MutableStateFlow(
+        NotificationTransportHealth.STOPPED,
+    )
+    val healthFlow: StateFlow<NotificationTransportHealth> =
+        _health.asStateFlow()
 
     override val name: String = "android-notification"
 
@@ -56,18 +66,16 @@ class NotificationQQTransport(
     )
 
     val health: NotificationTransportHealth
-        get() = when {
-            !started -> NotificationTransportHealth.STOPPED
-            listenerConnected -> NotificationTransportHealth.CONNECTED
-            else -> NotificationTransportHealth.WAITING_FOR_LISTENER
-        }
+        get() = _health.value
 
     override suspend fun start() {
         started = true
+        updateHealth()
     }
 
     override suspend fun stop() {
         started = false
+        updateHealth()
     }
 
     override suspend fun receive(): IncomingTransportEvent {
@@ -130,10 +138,11 @@ class NotificationQQTransport(
     }
 
     fun onListenerConnectionChanged(connected: Boolean) {
-        listenerConnected = connected
+        _listenerConnected.value = connected
         if (!connected) {
             replyActions.clear()
         }
+        updateHealth()
     }
 
     fun onNotificationPosted(
@@ -210,6 +219,16 @@ class NotificationQQTransport(
                 identity.conversationId,
                 current,
             )
+        }
+    }
+
+    private fun updateHealth() {
+        _health.value = when {
+            !started -> NotificationTransportHealth.STOPPED
+            _listenerConnected.value ->
+                NotificationTransportHealth.CONNECTED
+            else ->
+                NotificationTransportHealth.WAITING_FOR_LISTENER
         }
     }
 
