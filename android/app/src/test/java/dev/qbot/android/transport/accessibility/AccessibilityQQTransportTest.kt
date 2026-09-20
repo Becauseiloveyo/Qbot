@@ -40,6 +40,27 @@ class AccessibilityQQTransportTest {
     }
 
     @Test
+    fun serviceDisconnectStopsTransportAndDropsCapability() = runTest {
+        val transport = AccessibilityQQTransport()
+        transport.start()
+        transport.onServiceConnected()
+        transport.updateReplySession(
+            ProbeSession(
+                accountId = "acc-1",
+                conversationId = "conv-1",
+            ),
+        )
+
+        assertEquals(AdapterHealth.READY, transport.snapshot().health)
+        assertTrue(TransportCapability.SEND_TEXT in transport.capabilities)
+
+        transport.onServiceDisconnected()
+
+        assertEquals(AdapterHealth.STOPPED, transport.snapshot().health)
+        assertFalse(TransportCapability.SEND_TEXT in transport.capabilities)
+    }
+
+    @Test
     fun exactConversationCanSendButDifferentConversationIsRejected() = runTest {
         val session = ProbeSession(
             accountId = "acc-1",
