@@ -2,12 +2,12 @@
 
 Last updated: 2026-09-20
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.6 — Android Enhanced Transports
-Current branch: `feature/android-v0.6-enhanced-transports`
+Current milestone: v0.7 — Hybrid Memory
+Current branch: `feature/v0.7-hybrid-memory`
 
 ## Current objective
 
-Add Android enhanced transport capabilities behind the existing platform-neutral QQTransport boundary. Accessibility/Shizuku may improve observation or interaction only where their behavior can be identified, capability-reported, policy-gated, durably outboxed, and tested without weakening v0.5 recovery/idempotency guarantees.
+Build Hybrid Memory as durable, provenance-aware state before retrieval complexity: candidate staging, trust/scope policy, authoritative promotion, append/supersede history, then deterministic keyword/entity/temporal/importance retrieval. Active Task/Checkpoint remains direct-loaded and outside normal memory retrieval.
 
 ## Completed
 
@@ -192,7 +192,9 @@ Add Android enhanced transport capabilities behind the existing platform-neutral
 
 ## In progress
 
-- Create the v0.7 Hybrid Memory branch from the verified v0.6 head and begin candidate-memory staging/provenance persistence.
+- Add Desktop and Android durable `memories` persistence with explicit migrations and equivalent provenance/trust fields.
+- Implement Candidate -> Promoted/Rejected transitions and append/supersede history with journaled authoritative promotion.
+- Add trust-boundary conformance so CONTACT content cannot become SYSTEM_POLICY or USER_PERSONA memory.
 
 ## Not started
 
@@ -227,13 +229,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Confirm the latest Android exact-token CI result and close any reported v0.6 regression.
-2. Mark v0.6 roadmap deliverables complete once the latest Android, Desktop, and Conformance checks are green.
-3. Create `feature/v0.7-hybrid-memory` from the verified v0.6 head.
-4. Implement candidate-memory staging and provenance/trust persistence first; external/contact text must not directly become trusted persona/system memory.
-5. Add append/supersede memory history and deterministic FTS/entity/temporal/importance retrieval before semantic embeddings.
-6. Add semantic retrieval as a pluggable scorer and keep active Task/Checkpoint outside normal memory retrieval.
-7. Add background memory extraction/summarization only after synchronous durable reply/task state remains independent from indexing.
+1. Finish Desktop memory schema v4 migration and MemoryRepository tests.
+2. Add Android Room MemoryEntity + explicit v1->v2 migration + repository parity tests.
+3. Add deterministic FTS/keyword, entity, temporal, importance and trust scoring; do not add embeddings yet.
+4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval is stable.
+5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
+6. Add background candidate extraction/summarization only after durable staging/promotion works independently from indexing.
+7. Run v0.7 cross-runtime exit tests and update memory/security documentation.
 
 ## Resume rule
 
