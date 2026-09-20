@@ -43,11 +43,13 @@ interface AccessibilityUiDriver {
 
     fun setComposerText(
         profile: AccessibilityUiProfile,
+        expectedConversationToken: String,
         text: String,
     ): Boolean
 
     fun clickSend(
         profile: AccessibilityUiProfile,
+        expectedConversationToken: String,
     ): Boolean
 }
 
@@ -79,7 +81,14 @@ class ProfileBoundAccessibilityReplySession(
             )
         }
 
-        if (!driver.setComposerText(spec.profile, text)) {
+        if (
+            !driver.setComposerText(
+                profile = spec.profile,
+                expectedConversationToken =
+                    spec.binding.expectedConversationToken,
+                text = text,
+            )
+        ) {
             return AccessibilityReplyResult(
                 actionAccepted = false,
                 error = "accessibility composer rejected text action",
@@ -96,7 +105,13 @@ class ProfileBoundAccessibilityReplySession(
             )
         }
 
-        if (!driver.clickSend(spec.profile)) {
+        if (
+            !driver.clickSend(
+                profile = spec.profile,
+                expectedConversationToken =
+                    spec.binding.expectedConversationToken,
+            )
+        ) {
             return AccessibilityReplyResult(
                 actionAccepted = false,
                 error = "accessibility send action was not accepted",
