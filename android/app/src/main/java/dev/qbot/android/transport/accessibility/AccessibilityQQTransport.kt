@@ -155,6 +155,7 @@ class AccessibilityQQTransport : QQTransport {
 
     fun onServiceDisconnected() {
         serviceConnected = false
+        started = false
         replySession = null
     }
 
