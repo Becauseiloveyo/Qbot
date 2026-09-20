@@ -20,5 +20,14 @@ class CliTests(unittest.TestCase):
         self.assertEqual(args.onebot_url, "ws://127.0.0.1:3001/")
 
 
+    def test_run_defaults_to_observe_mode(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            args = _parser().parse_args(["run"])
+        self.assertEqual(args.agent_mode, "observe")
+
+    def test_assist_mode_requires_explicit_selection(self) -> None:
+        args = _parser().parse_args(["run", "--agent-mode", "assist"])
+        self.assertEqual(args.agent_mode, "assist")
+
 if __name__ == "__main__":
     unittest.main()
