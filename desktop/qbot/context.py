@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
-from qbot.llm import LlmMessage
+from qbot.llm.base import LlmMessage
 from qbot.persona import ContactProfile, Persona
 
 
