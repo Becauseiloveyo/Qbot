@@ -201,6 +201,130 @@ class NotificationRecoveryRoomTest {
         }
     }
 
+    @Test
+    fun deferredPendingSendsAfterRemoteInputCapabilityReturns() = runBlocking {
+        val actionName = "dev.qbot.android.TEST_RETURNED_REMOTE_REPLY"
+        val receivedText = AtomicReference<String?>()
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                receivedText.set(
+                    RemoteInput.getResultsFromIntent(intent)
+                        ?.getCharSequence("reply_text")
+                        ?.toString(),
+                )
+            }
+        }
+        context.registerReceiver(
+            receiver,
+            IntentFilter(actionName),
+            Context.RECEIVER_NOT_EXPORTED,
+        )
+
+        try {
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                42,
+                Intent(actionName).setPackage(context.packageName),
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_MUTABLE,
+            )
+            val remoteInput = RemoteInput.Builder("reply_text")
+                .setAllowFreeFormInput(true)
+                .build()
+            val action = Notification.Action.Builder(
+                android.R.drawable.ic_menu_send,
+                "Reply",
+                pendingIntent,
+            )
+                .addRemoteInput(remoteInput)
+                .setSemanticAction(
+                    Notification.Action.SEMANTIC_ACTION_REPLY,
+                )
+                .build()
+            val sbn = statusBarNotification(action)
+            val identity =
+                dev.qbot.android.transport.notification
+                    .NotificationConversationIdentityResolver()
+                    .resolve(sbn)
+            val accountId =
+                NotificationQQTransport.accountIdForPackage(
+                    "com.tencent.mobileqq",
+                )
+
+            val transport = NotificationQQTransport(context)
+            transport.start()
+            transport.onListenerConnectionChanged(true)
+
+            val runId = createExecutingRun(
+                accountId = accountId,
+                conversationId = identity.conversationId,
+            )
+            val outbox = OutboxRepository(
+                database = database,
+                clock = clock,
+                idFactory = ::nextId,
+            )
+            val effect = outbox.createText(
+                runId = runId,
+                accountId = accountId,
+                conversationId = identity.conversationId,
+                dedupeKey = "notification-returned-effect",
+                text = "send after capability returns",
+            )
+            val runs = AgentRunRepository(database.qbotDao(), clock)
+
+            val first = RecoveryExecutor(
+                planner = RecoveryPlanner(
+                    runs = runs,
+                    outbox = outbox,
+                    transport = transport,
+                ),
+                runs = runs,
+                outbox = outbox,
+                transport = transport,
+            ).run(RecoveryMode.ASSIST)
+
+            assertEquals(
+                RecoveryOutcome.DEFERRED,
+                first.executions.single {
+                    it.item.outboxId == effect.outboxId
+                }.outcome,
+            )
+            assertEquals("PENDING", outbox.load(effect.outboxId).status)
+            assertEquals(0, outbox.load(effect.outboxId).transportAttempts)
+
+            assertTrue(transport.onNotificationPosted(sbn))
+            transport.receive()
+
+            val second = RecoveryExecutor(
+                planner = RecoveryPlanner(
+                    runs = runs,
+                    outbox = outbox,
+                    transport = transport,
+                ),
+                runs = runs,
+                outbox = outbox,
+                transport = transport,
+            ).run(RecoveryMode.ASSIST)
+
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+
+            assertEquals(
+                RecoveryOutcome.SENT,
+                second.executions.single {
+                    it.item.outboxId == effect.outboxId
+                }.outcome,
+            )
+            assertEquals("SENT", outbox.load(effect.outboxId).status)
+            assertEquals(1, outbox.load(effect.outboxId).transportAttempts)
+            assertEquals("SUCCEEDED", runs.load(runId)?.status)
+            assertEquals("send after capability returns", receivedText.get())
+            transport.stop()
+        } finally {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
     private suspend fun createExecutingRun(
         accountId: String,
         conversationId: String,
