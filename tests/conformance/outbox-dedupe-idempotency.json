@@ -1,0 +1,55 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "duplicate outbox dedupe key cannot create second effect",
+  "given": {
+    "outboxes": [
+      {
+        "schema_version": "0.1.0",
+        "outbox_id": "out-dup-1",
+        "run_id": "run-1",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "dedupe_key": "run-1:reply-main",
+        "status": "PENDING",
+        "payload": {
+          "kind": "TEXT",
+          "text": "在",
+          "content_ref": null,
+          "reply_to_message_id": "msg-100"
+        },
+        "platform_message_id": null,
+        "transport_attempts": 0,
+        "last_error": null,
+        "writer_epoch": 5,
+        "created_at": "2026-09-20T06:10:05Z",
+        "sent_at": null
+      },
+      {
+        "schema_version": "0.1.0",
+        "outbox_id": "out-dup-2",
+        "run_id": "run-1",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "dedupe_key": "run-1:reply-main",
+        "status": "PENDING",
+        "payload": {
+          "kind": "TEXT",
+          "text": "在",
+          "content_ref": null,
+          "reply_to_message_id": "msg-100"
+        },
+        "platform_message_id": null,
+        "transport_attempts": 0,
+        "last_error": null,
+        "writer_epoch": 5,
+        "created_at": "2026-09-20T06:10:06Z",
+        "sent_at": null
+      }
+    ]
+  },
+  "expect": {
+    "unique_account_dedupe_pairs": 1,
+    "effects_created": 1,
+    "second_insert_rejected": true
+  }
+}
