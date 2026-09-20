@@ -53,6 +53,7 @@ class RoutedSendExecutor(
         val sent = SendExecutor(
             outbox = outbox,
             transport = selection.binding.transport,
+            attemptTransportId = selectedId,
         ).send(outboxId)
 
         return when (sent.status) {
