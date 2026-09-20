@@ -24,6 +24,25 @@ class AccessibilityUiReplySessionTest {
     )
 
     @Test
+    fun mismatchedProfileBindingCannotBeArmed() {
+        val mismatched = AccessibilitySessionSpec(
+            profile = profile,
+            binding = binding.copy(
+                profileId = "different-profile",
+            ),
+        )
+
+        try {
+            AccessibilitySessionSpecProvider.arm(mismatched)
+            throw AssertionError("mismatched binding should have been rejected")
+        } catch (_: IllegalArgumentException) {
+            // Expected.
+        } finally {
+            AccessibilitySessionSpecProvider.clear()
+        }
+    }
+
+    @Test
     fun exactProfileTokenAndUniqueControlsCreateValidSession() {
         val driver = FakeDriver(
             inspection = matchingInspection(),
