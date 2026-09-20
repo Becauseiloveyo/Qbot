@@ -1,0 +1,53 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "duplicate inbound fingerprint creates one primary run",
+  "given": {
+    "events": [
+      {
+        "schema_version": "0.1.0",
+        "event_id": "evt-dup-1",
+        "fingerprint": "qq:acc-1:conv-1:msg-100",
+        "platform": "qq",
+        "transport": "mock",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "sender_id": "contact-1",
+        "platform_message_id": "msg-100",
+        "event_type": "MESSAGE_RECEIVED",
+        "message_type": "private",
+        "text": "在吗",
+        "content_ref": null,
+        "reply_to_message_id": null,
+        "occurred_at": "2026-09-20T06:10:00Z",
+        "received_at": "2026-09-20T06:10:01Z",
+        "raw_ref": null,
+        "metadata": {}
+      },
+      {
+        "schema_version": "0.1.0",
+        "event_id": "evt-dup-2",
+        "fingerprint": "qq:acc-1:conv-1:msg-100",
+        "platform": "qq",
+        "transport": "mock-reconnect",
+        "account_id": "acc-1",
+        "conversation_id": "conv-1",
+        "sender_id": "contact-1",
+        "platform_message_id": "msg-100",
+        "event_type": "MESSAGE_RECEIVED",
+        "message_type": "private",
+        "text": "在吗",
+        "content_ref": null,
+        "reply_to_message_id": null,
+        "occurred_at": "2026-09-20T06:10:00Z",
+        "received_at": "2026-09-20T06:10:04Z",
+        "raw_ref": null,
+        "metadata": {}
+      }
+    ]
+  },
+  "expect": {
+    "unique_fingerprints": 1,
+    "primary_agent_runs_created": 1,
+    "duplicate_is_noop": true
+  }
+}
