@@ -8,7 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Looper
-import android.os.UserHandle
+import android.os.Process
 import android.service.notification.StatusBarNotification
 import dev.qbot.android.transport.OutgoingMessage
 import dev.qbot.android.transport.TransportCapability
@@ -259,9 +259,9 @@ class NotificationQQTransportTest {
             "tag-" + id,
             1000,
             2000,
+            0,
             builder.build(),
-            UserHandle.of(0),
-            null,
+            Process.myUserHandle(),
             1_789_900_000_000L + id,
         )
     }
