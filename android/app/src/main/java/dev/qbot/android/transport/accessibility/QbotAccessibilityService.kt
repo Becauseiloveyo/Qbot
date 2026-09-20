@@ -3,6 +3,7 @@ package dev.qbot.android.transport.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
+import dev.qbot.android.work.StartupRecoveryWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,12 +18,19 @@ class QbotAccessibilityService : AccessibilityService() {
         AccessibilityTransportProvider.get()
     }
 
+    private val uiDriver: AccessibilityUiDriver by lazy {
+        AndroidAccessibilityUiDriver(this)
+    }
+
+    private var activeReadyKey: String? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         scope.launch {
             transport.start()
             transport.onServiceConnected()
         }
+        refreshReplySession()
     }
 
     override fun onAccessibilityEvent(
@@ -30,21 +38,19 @@ class QbotAccessibilityService : AccessibilityService() {
     ) {
         val packageName = event.packageName?.toString()
         if (packageName !in SUPPORTED_PACKAGES) {
-            // A reply session is valid only for the positively recognized
-            // QQ/TIM foreground UI that created it.
-            transport.updateReplySession(null)
+            clearReplySession()
+            return
         }
 
-        // v0.6 intentionally does not infer SEND_TEXT from permission alone.
-        // A later recognizer must prove an exact conversation + composer +
-        // send action before installing a short-lived reply session.
+        refreshReplySession()
     }
 
     override fun onInterrupt() {
-        transport.updateReplySession(null)
+        clearReplySession()
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        clearReplySession()
         transport.onServiceDisconnected()
         scope.launch {
             transport.stop()
@@ -53,9 +59,52 @@ class QbotAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        clearReplySession()
         transport.onServiceDisconnected()
         scope.cancel()
         super.onDestroy()
+    }
+
+    private fun refreshReplySession() {
+        val spec = AccessibilitySessionSpecProvider.current()
+        if (
+            spec == null ||
+            spec.profile.packageName !in SUPPORTED_PACKAGES
+        ) {
+            clearReplySession()
+            return
+        }
+
+        val session = ProfileBoundAccessibilityReplySession(
+            spec = spec,
+            driver = uiDriver,
+        )
+        if (!session.isValid()) {
+            clearReplySession()
+            return
+        }
+
+        transport.updateReplySession(session)
+
+        val readyKey = listOf(
+            spec.binding.accountId,
+            spec.binding.conversationId,
+            spec.binding.profileId,
+            spec.binding.expectedConversationToken,
+        ).joinToString("\u001f")
+
+        if (activeReadyKey != readyKey) {
+            activeReadyKey = readyKey
+            // A PENDING Outbox effect may have been deferred while no exact
+            // accessibility session existed. Revisit it only when the exact
+            // bound session transitions into READY.
+            StartupRecoveryWorker.enqueue(this)
+        }
+    }
+
+    private fun clearReplySession() {
+        activeReadyKey = null
+        transport.updateReplySession(null)
     }
 
     companion object {
