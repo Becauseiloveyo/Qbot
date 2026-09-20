@@ -27,6 +27,11 @@ interface QbotDao {
     suspend fun agentRun(runId: String): AgentRunEntity?
 
     @Query(
+        "SELECT * FROM agent_runs WHERE trigger_event_id = :eventId LIMIT 1",
+    )
+    suspend fun agentRunByTriggerEvent(eventId: String): AgentRunEntity?
+
+    @Query(
         """
         UPDATE agent_runs
         SET status = :targetStatus, updated_at = :updatedAt
