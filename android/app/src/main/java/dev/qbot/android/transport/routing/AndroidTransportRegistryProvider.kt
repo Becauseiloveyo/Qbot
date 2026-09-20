@@ -11,6 +11,21 @@ object AndroidTransportRegistryProvider {
     @Volatile
     private var instance: TransportRegistry? = null
 
+    @Volatile
+    private var experimentalProvider: ExperimentalTransportProvider =
+        DisabledExperimentalTransportProvider()
+
+    fun configureExperimental(
+        provider: ExperimentalTransportProvider,
+    ) {
+        synchronized(this) {
+            check(instance == null) {
+                "experimental transport must be configured before registry initialization"
+            }
+            experimentalProvider = provider
+        }
+    }
+
     fun get(
         context: Context,
     ): TransportRegistry {
@@ -19,6 +34,7 @@ object AndroidTransportRegistryProvider {
         return synchronized(this) {
             instance ?: create(
                 context.applicationContext,
+                experimentalProvider,
             ).also { created ->
                 instance = created
             }
@@ -27,8 +43,7 @@ object AndroidTransportRegistryProvider {
 
     private fun create(
         context: Context,
-        experimentalProvider: ExperimentalTransportProvider =
-            DisabledExperimentalTransportProvider(),
+        experimentalProvider: ExperimentalTransportProvider,
     ): TransportRegistry {
         val notification =
             NotificationTransportProvider.get(context)
