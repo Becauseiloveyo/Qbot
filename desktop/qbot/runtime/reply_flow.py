@@ -22,7 +22,7 @@ class ReplyFlowResult:
 
 
 class DurableReplyFlow:
-    """First end-to-end durable action path using deterministic mock reasoning."""
+    """Durable action path with pluggable decision engines."""
 
     def __init__(
         self,
@@ -127,7 +127,7 @@ class DurableReplyFlow:
                 dedupe_key=f"{run_id}:primary-reply",
             )
             if record is None:
-                proposal = self.decision.decide(run_id=run_id, event=event)
+                proposal = await self.decision.decide(run_id=run_id, event=event)
                 self._validate_proposal(proposal)
                 record = self._ensure_outbox(proposal, event)
 
