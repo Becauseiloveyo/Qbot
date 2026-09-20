@@ -2,6 +2,8 @@ package dev.qbot.android.transport.routing
 
 import android.content.Context
 import dev.qbot.android.transport.accessibility.AccessibilityTransportProvider
+import dev.qbot.android.transport.experimental.DisabledExperimentalTransportProvider
+import dev.qbot.android.transport.experimental.ExperimentalTransportProvider
 import dev.qbot.android.transport.notification.NotificationTransportHealth
 import dev.qbot.android.transport.notification.NotificationTransportProvider
 
@@ -25,14 +27,15 @@ object AndroidTransportRegistryProvider {
 
     private fun create(
         context: Context,
+        experimentalProvider: ExperimentalTransportProvider =
+            DisabledExperimentalTransportProvider(),
     ): TransportRegistry {
         val notification =
             NotificationTransportProvider.get(context)
         val accessibility =
             AccessibilityTransportProvider.get()
 
-        return TransportRegistry(
-            listOf(
+        val bindings = mutableListOf(
                 TransportAdapterBinding(
                     transport = notification,
                     snapshot = {
@@ -68,7 +71,10 @@ object AndroidTransportRegistryProvider {
                         )
                     },
                 ),
-            ),
-        )
+            )
+
+        experimentalProvider.bindingOrNull()?.let(bindings::add)
+
+        return TransportRegistry(bindings)
     }
 }
