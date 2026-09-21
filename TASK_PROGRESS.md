@@ -219,11 +219,19 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - ADR-022 records the disposable/fallback FTS boundary.
 - Desktop tests now explicitly prove indexed == scan on the shared parity fixture, Unicode-normalized queries, explicit scan mode, short/non-ASCII fallback, and index rebuild after Memory growth. Desktop #509 ran 92 tests successfully.
 - Desktop FTS acceleration checkpoint passed on `09f4090`: Android Tests #236, Desktop Tests #509, and Conformance #535 all succeeded.
+- Added Android Room-backed disposable FTS4 candidate acceleration without adding an authoritative Room Entity or schema migration; Room schema remains v2.
+- Android FTS stores overlapping ASCII 3-grams derived from the same NFKC + Unicode case-fold normalized content/entities used by ADR-021. It is attempted only for simple normalized ASCII alphanumeric relevance signals of length >=3.
+- Android FTS executes one MATCH per relevance signal and unions candidate IDs in Kotlin, avoiding SQLite FTS4 multi-signal OR parser differences; each signal uses implicit-AND 3-gram matching to produce a safe substring candidate superset.
+- Short/non-ASCII/structured/empty/unsupported queries and FTS failures fall back to deterministic scan. Candidate IDs are then reloaded from authoritative `memories` and all ADR-021 state/domain/trust/temporal/relevance/scoring/tie-break rules are reapplied.
+- The Android derived FTS index lazily rebuilds on append-only Memory row-count divergence and remains outside Room schema export/versioning. ADR-023 records this boundary.
+- Android retrieval tests now prove indexed == scan against the shared cross-runtime fixture, explicit scan mode, short/non-ASCII fallback, and index rebuild after Memory growth.
+- Initial Android FTS query-composition attempts exposed FTS4 parser differences; final per-signal union implementation passed on `5beb91f`.
+- Android FTS checkpoint passed: Android Tests #243, Desktop Tests #517, and Conformance #543 all succeeded; Android Room schema verification/upload also passed.
 
 ## In progress
 
-- Add Android Room FTS candidate acceleration while preserving the shared ADR-021 eligibility/ranking oracle exactly.
-- Keep a deterministic Android scan fallback for unsupported/unsafe FTS queries and prove indexed == scan against the shared cross-runtime fixture.
+- Add semantic retrieval only as a pluggable, non-authoritative relevance scorer after deterministic + FTS retrieval are stable on both runtimes.
+- Freeze semantic scorer interfaces/fallback behavior so embeddings can never bypass ADR-021 eligibility, trust/domain boundaries, temporal validity, or Active Task/Checkpoint direct loading.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
@@ -260,12 +268,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add Android Room FTS candidate acceleration as a derived index only; preserve ADR-021 filtering/scoring and keep deterministic scan fallback for unsupported/unsafe queries.
-2. Add Android tests proving indexed retrieval and scan retrieval return identical ordered IDs and score components for the shared parity fixture, plus fallback/rebuild behavior equivalent to Desktop.
-3. Re-run cross-runtime parity after Android FTS and document the final FTS boundary before semantic retrieval.
-4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval and FTS acceleration are stable; embeddings are never authoritative.
+1. Define a provider-neutral semantic relevance scorer contract whose output is advisory and cannot alter ADR-021 eligibility; include deterministic no-op/fallback behavior when no embedding backend is configured.
+2. Integrate the semantic scorer into Desktop retrieval behind an explicit opt-in path, with deterministic retrieval/FTS remaining sufficient for correctness and with score provenance exposed for audit.
+3. Add tests proving semantic scorer failure/unavailability cannot remove mandatory deterministic results, cannot admit ineligible memories, and cannot change Active Task/Checkpoint loading.
+4. Mirror the stable semantic scorer contract on Android only after Desktop behavior is frozen, then add cross-runtime contract fixtures where practical.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
-6. Add background candidate extraction/summarization only after durable staging/promotion and deterministic retrieval work independently.
+6. Add background candidate extraction/summarization only after durable staging/promotion and retrieval work independently.
 7. Run v0.7 cross-runtime exit tests and update memory/security documentation.
 
 ## Resume rule
