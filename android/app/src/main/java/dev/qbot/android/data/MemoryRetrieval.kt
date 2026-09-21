@@ -212,7 +212,7 @@ class MemoryRetriever(
                 val expression = signals.joinToString(" OR ") { signal ->
                     val grams = trigrams(signal)
                     grams.joinToString(
-                        separator = " AND ",
+                        separator = " ",
                         prefix = "(",
                         postfix = ")",
                     ) { gram -> "\"$gram\"" }
