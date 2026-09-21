@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "android/**"
+      - "tests/conformance/memory-retrieval-parity.json"
       - ".github/workflows/android.yml"
   push:
     paths:
       - "android/**"
+      - "tests/conformance/memory-retrieval-parity.json"
       - ".github/workflows/android.yml"
 
 jobs:

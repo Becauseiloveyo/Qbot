@@ -3,7 +3,9 @@ package dev.qbot.android.data
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
+import dev.qbot.android.data.db.MemoryEntity
 import dev.qbot.android.data.db.QbotDatabase
+import java.io.File
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -15,6 +17,8 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.json.JSONArray
+import org.json.JSONObject
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
@@ -331,6 +335,104 @@ class MemoryRetrievalRoomTest {
         )
         assertTrue(first.all { it.record.trust >= 0.5 })
     }
+
+
+    @Test
+    fun sharedCrossRuntimeRetrievalFixture() = runBlocking {
+        val repoRoot = System.getProperty("qbot.repo.root")
+            ?: error("qbot.repo.root system property is required")
+        val fixtureFile = File(
+            repoRoot,
+            "tests/conformance/memory-retrieval-parity.json",
+        )
+        assertTrue("shared retrieval fixture must exist", fixtureFile.isFile)
+
+        val fixture = JSONObject(fixtureFile.readText())
+        val given = fixture.getJSONObject("given")
+        val records = given.getJSONArray("memories")
+        for (index in 0 until records.length()) {
+            val item = records.getJSONObject(index)
+            val provenance = item.getJSONObject("provenance")
+            val inserted = database.qbotDao().insertMemoryIfAbsent(
+                MemoryEntity(
+                    memoryId = item.getString("memory_id"),
+                    schemaVersion = item.getString("schema_version"),
+                    state = item.getString("state"),
+                    scope = item.getString("scope"),
+                    ownerId = nullableString(item, "owner_id"),
+                    conversationId = nullableString(item, "conversation_id"),
+                    taskId = nullableString(item, "task_id"),
+                    content = item.getString("content"),
+                    entitiesJson = item.getJSONArray("entities").toString(),
+                    importance = nullableDouble(item, "importance"),
+                    trust = item.getDouble("trust"),
+                    confidence = nullableDouble(item, "confidence"),
+                    sourceType = provenance.getString("source_type"),
+                    sourceMessageId = nullableString(provenance, "source_message_id"),
+                    sourceEventId = nullableString(provenance, "source_event_id"),
+                    validFrom = nullableString(item, "valid_from"),
+                    validTo = nullableString(item, "valid_to"),
+                    supersedes = nullableString(item, "supersedes"),
+                    createdAt = item.getString("created_at"),
+                ),
+            )
+            assertTrue(inserted != -1L)
+        }
+
+        val cases = given.getJSONArray("retrieval_cases")
+        for (caseIndex in 0 until cases.length()) {
+            val fixtureCase = cases.getJSONObject(caseIndex)
+            val rawQuery = fixtureCase.getJSONObject("query")
+            val query = MemoryQuery(
+                scopes = stringList(rawQuery.getJSONArray("scopes")),
+                text = rawQuery.optString("text", ""),
+                ownerId = nullableString(rawQuery, "owner_id"),
+                conversationId = nullableString(rawQuery, "conversation_id"),
+                taskId = nullableString(rawQuery, "task_id"),
+                entities = stringList(rawQuery.getJSONArray("entities")),
+                minTrust = rawQuery.getDouble("min_trust"),
+                limit = rawQuery.getInt("limit"),
+            )
+            val hits = retriever.retrieve(
+                query = query,
+                now = Instant.parse(fixtureCase.getString("evaluation_time")),
+            )
+            val expected = fixtureCase
+                .getJSONObject("expect")
+                .getJSONArray("hits")
+
+            assertEquals(
+                "case ${fixtureCase.getString("case_id")} hit count",
+                expected.length(),
+                hits.size,
+            )
+            for (hitIndex in 0 until expected.length()) {
+                val expectedHit = expected.getJSONObject(hitIndex)
+                val expectedScore = expectedHit.getJSONObject("score")
+                val hit = hits[hitIndex]
+                assertEquals(expectedHit.getString("memory_id"), hit.record.memoryId)
+                assertEquals(expectedScore.getInt("total_points"), hit.score.totalPoints)
+                assertEquals(expectedScore.getInt("keyword_milli"), hit.score.keywordMilli)
+                assertEquals(expectedScore.getInt("entity_milli"), hit.score.entityMilli)
+                assertEquals(expectedScore.getInt("recency_milli"), hit.score.recencyMilli)
+                assertEquals(expectedScore.getInt("importance_milli"), hit.score.importanceMilli)
+                assertEquals(expectedScore.getInt("trust_milli"), hit.score.trustMilli)
+            }
+        }
+    }
+
+    private fun nullableString(value: JSONObject, key: String): String? =
+        if (!value.has(key) || value.isNull(key)) null else value.getString(key)
+
+    private fun nullableDouble(value: JSONObject, key: String): Double? =
+        if (!value.has(key) || value.isNull(key)) null else value.getDouble(key)
+
+    private fun stringList(value: JSONArray): List<String> =
+        buildList {
+            for (index in 0 until value.length()) {
+                add(value.getString(index))
+            }
+        }
 
     private suspend fun promote(
         scope: String,

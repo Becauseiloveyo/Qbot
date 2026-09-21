@@ -41,6 +41,10 @@ android {
                 "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
                 "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
             )
+            it.systemProperty(
+                "qbot.repo.root",
+                rootProject.projectDir.parentFile.absolutePath,
+            )
         }
     }
 

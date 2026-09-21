@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from qbot.memory_retrieval import (
 )
 from qbot.persistence import Database
 from qbot.persistence.memory import MemoryRepository
+from qbot.persistence.tables import memories
 
 
 NOW = datetime(2026, 9, 20, 16, 30, tzinfo=UTC)
@@ -283,6 +285,80 @@ class MemoryRetrievalTests(unittest.TestCase):
             [hit.record.memory_id for hit in first],
             [hit.record.memory_id for hit in second],
         )
+
+
+    def test_shared_cross_runtime_retrieval_fixture(self) -> None:
+        fixture_path = (
+            Path(__file__).resolve().parents[2]
+            / "tests"
+            / "conformance"
+            / "memory-retrieval-parity.json"
+        )
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+        with self.db.transaction() as conn:
+            for item in fixture["given"]["memories"]:
+                provenance = item["provenance"]
+                conn.execute(
+                    memories.insert().values(
+                        schema_version=item["schema_version"],
+                        memory_id=item["memory_id"],
+                        state=item["state"],
+                        scope=item["scope"],
+                        owner_id=item.get("owner_id"),
+                        conversation_id=item.get("conversation_id"),
+                        task_id=item.get("task_id"),
+                        content=item["content"],
+                        entities_json=json.dumps(
+                            item.get("entities", []),
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
+                        importance=item.get("importance"),
+                        trust=item["trust"],
+                        confidence=item.get("confidence"),
+                        source_type=provenance["source_type"],
+                        source_message_id=provenance.get("source_message_id"),
+                        source_event_id=provenance.get("source_event_id"),
+                        valid_from=item.get("valid_from"),
+                        valid_to=item.get("valid_to"),
+                        supersedes=item.get("supersedes"),
+                        created_at=item["created_at"],
+                    )
+                )
+
+        for case in fixture["given"]["retrieval_cases"]:
+            with self.subTest(case_id=case["case_id"]):
+                raw_query = case["query"]
+                query = MemoryQuery(
+                    scopes=tuple(raw_query["scopes"]),
+                    text=raw_query.get("text", ""),
+                    owner_id=raw_query.get("owner_id"),
+                    conversation_id=raw_query.get("conversation_id"),
+                    task_id=raw_query.get("task_id"),
+                    entities=tuple(raw_query.get("entities", [])),
+                    min_trust=raw_query.get("min_trust", 0.0),
+                    limit=raw_query.get("limit", 10),
+                )
+                now = datetime.fromisoformat(
+                    case["evaluation_time"].replace("Z", "+00:00")
+                )
+                hits = self.retriever.retrieve(query, now=now)
+                expected = case["expect"]["hits"]
+
+                self.assertEqual(
+                    [item["memory_id"] for item in expected],
+                    [hit.record.memory_id for hit in hits],
+                )
+                for hit, expected_hit in zip(hits, expected, strict=True):
+                    expected_score = expected_hit["score"]
+                    self.assertEqual(expected_score["total_points"], hit.score.total_points)
+                    self.assertEqual(expected_score["keyword_milli"], hit.score.keyword_milli)
+                    self.assertEqual(expected_score["entity_milli"], hit.score.entity_milli)
+                    self.assertEqual(expected_score["recency_milli"], hit.score.recency_milli)
+                    self.assertEqual(expected_score["importance_milli"], hit.score.importance_milli)
+                    self.assertEqual(expected_score["trust_milli"], hit.score.trust_milli)
+
 
 
 if __name__ == "__main__":
