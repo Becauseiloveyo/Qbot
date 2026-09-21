@@ -212,11 +212,18 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - `tools/validate_conformance.py` now independently re-evaluates ADR-021 retrieval semantics and rejects fixture expectations that do not match the frozen deterministic contract.
 - Desktop and Android retrieval tests consume the exact same shared JSON fixture rather than duplicated platform fixtures. Android Gradle receives the repository root explicitly for unit tests, and Android CI now reruns when the shared retrieval fixture changes.
 - Cross-runtime deterministic retrieval parity passed on commit `5ec0aea`: Android Tests #234, Desktop Tests #505, and Conformance #531 all succeeded; Android Room schema remains v2.
+- Added optional Desktop SQLite FTS5/trigram candidate acceleration as a disposable derived index; authoritative `memories` and ADR-021 scoring remain unchanged.
+- FTS indexes NFKC + Unicode case-fold normalized content/entities, is used only for simple normalized ASCII alphanumeric relevance signals of length >=3, and falls back to deterministic scan for short/non-ASCII/structured/empty/unsupported queries or any FTS error.
+- FTS candidate IDs are always rechecked through PROMOTED/state, scope/domain, trust, temporal validity, exact relevance components, ADR-021 integer scoring, and stable tie-break rules before returning results.
+- The derived index lazily rebuilds when append-only Memory row count diverges from index row count; it is not part of the authoritative Desktop schema version, so lack of FTS5/trigram support cannot trigger Safe Mode.
+- ADR-022 records the disposable/fallback FTS boundary.
+- Desktop tests now explicitly prove indexed == scan on the shared parity fixture, Unicode-normalized queries, explicit scan mode, short/non-ASCII fallback, and index rebuild after Memory growth. Desktop #509 ran 92 tests successfully.
+- Desktop FTS acceleration checkpoint passed on `09f4090`: Android Tests #236, Desktop Tests #509, and Conformance #535 all succeeded.
 
 ## In progress
 
-- Add SQLite FTS5 and Android Room FTS as candidate accelerators while preserving the shared ADR-021 eligibility/ranking oracle exactly.
-- Prove indexed and non-indexed retrieval return identical ordered IDs and score components for the shared cross-runtime fixture.
+- Add Android Room FTS candidate acceleration while preserving the shared ADR-021 eligibility/ranking oracle exactly.
+- Keep a deterministic Android scan fallback for unsupported/unsafe FTS queries and prove indexed == scan against the shared cross-runtime fixture.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
@@ -253,9 +260,9 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add Desktop SQLite FTS5 candidate acceleration for memory content/entities without changing ADR-021 eligibility or score computation; keep a deterministic scan fallback when FTS5 is unavailable or unsuitable.
-2. Add tests proving Desktop indexed retrieval and scan retrieval produce identical ordered IDs and score components for the shared parity fixture, including Unicode/fallback cases.
-3. Add Android Room FTS candidate acceleration only after the Desktop accelerator boundary is stable, with equivalent scan fallback and shared-fixture parity.
+1. Add Android Room FTS candidate acceleration as a derived index only; preserve ADR-021 filtering/scoring and keep deterministic scan fallback for unsupported/unsafe queries.
+2. Add Android tests proving indexed retrieval and scan retrieval return identical ordered IDs and score components for the shared parity fixture, plus fallback/rebuild behavior equivalent to Desktop.
+3. Re-run cross-runtime parity after Android FTS and document the final FTS boundary before semantic retrieval.
 4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval and FTS acceleration are stable; embeddings are never authoritative.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
 6. Add background candidate extraction/summarization only after durable staging/promotion and deterministic retrieval work independently.
