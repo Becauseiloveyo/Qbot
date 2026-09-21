@@ -207,11 +207,16 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - Added Android Room retrieval regression tests covering authoritative-state/domain isolation, deterministic component scores, temporal validity, relevance filtering, explicit domain requirements, min-trust filtering, stable ordering, and limits.
 - Android deterministic retrieval required no Room schema change; schema remains v2 and FTS/index persistence is still deferred until cross-runtime parity fixtures pass.
 - Latest retrieval parity checkpoint passed on `de842dc`: Android Tests #231, Desktop Tests #501, and Conformance #527 all succeeded.
+- Added shared `tests/conformance/memory-retrieval-parity.json` as the cross-runtime deterministic retrieval oracle. It contains explicit persisted memory rows, fixed evaluation times, query/domain parameters, expected ordered IDs, and expected integer score components.
+- Shared retrieval coverage includes PROMOTED-only state filtering, wrong-domain exclusion, future/expired filtering, min-trust filtering, relevance fail-closed behavior, weighted score ordering, Unicode NFKC + case-fold parity, and sub-second created-at tie-breaking.
+- `tools/validate_conformance.py` now independently re-evaluates ADR-021 retrieval semantics and rejects fixture expectations that do not match the frozen deterministic contract.
+- Desktop and Android retrieval tests consume the exact same shared JSON fixture rather than duplicated platform fixtures. Android Gradle receives the repository root explicitly for unit tests, and Android CI now reruns when the shared retrieval fixture changes.
+- Cross-runtime deterministic retrieval parity passed on commit `5ec0aea`: Android Tests #234, Desktop Tests #505, and Conformance #531 all succeeded; Android Room schema remains v2.
 
 ## In progress
 
-- Add shared cross-runtime retrieval fixtures so Desktop and Android consume the same records/query and must produce the same eligible memory IDs, score components, and ordering.
-- Extend conformance validation around the frozen ADR-021 retrieval semantics before adding backend-specific FTS acceleration.
+- Add SQLite FTS5 and Android Room FTS as candidate accelerators while preserving the shared ADR-021 eligibility/ranking oracle exactly.
+- Prove indexed and non-indexed retrieval return identical ordered IDs and score components for the shared cross-runtime fixture.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
@@ -248,9 +253,9 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Add shared cross-runtime deterministic retrieval fixtures with explicit stored memory rows, query parameters, evaluation time, expected eligible IDs/order, and expected integer score components.
-2. Make Desktop and Android retrieval tests consume the shared fixtures and extend `tools/validate_conformance.py` to validate the fixture contract independently of either runtime.
-3. Add SQLite FTS5 and Android Room FTS as candidate accelerators only after shared parity passes; indexed retrieval must preserve the frozen deterministic eligibility/ranking contract.
+1. Add Desktop SQLite FTS5 candidate acceleration for memory content/entities without changing ADR-021 eligibility or score computation; keep a deterministic scan fallback when FTS5 is unavailable or unsuitable.
+2. Add tests proving Desktop indexed retrieval and scan retrieval produce identical ordered IDs and score components for the shared parity fixture, including Unicode/fallback cases.
+3. Add Android Room FTS candidate acceleration only after the Desktop accelerator boundary is stable, with equivalent scan fallback and shared-fixture parity.
 4. Add semantic retrieval only as a pluggable scorer after deterministic retrieval and FTS acceleration are stable; embeddings are never authoritative.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
 6. Add background candidate extraction/summarization only after durable staging/promotion and deterministic retrieval work independently.
