@@ -209,24 +209,21 @@ class MemoryRetriever(
                     rebuildFts(db)
                 }
 
-                val expression = signals.joinToString(" OR ") { signal ->
-                    val grams = trigrams(signal)
-                    grams.joinToString(
-                        separator = " ",
-                        prefix = "(",
-                        postfix = ")",
-                    ) { gram -> "\"$gram\"" }
-                }
-
                 val result = linkedSetOf<String>()
-                db.query(
-                    "SELECT memory_id FROM $MEMORY_FTS_TABLE " +
-                        "WHERE grams MATCH ?",
-                    arrayOf(expression),
-                ).use { cursor ->
-                    val idIndex = cursor.getColumnIndexOrThrow("memory_id")
-                    while (cursor.moveToNext()) {
-                        result += cursor.getString(idIndex)
+                for (signal in signals) {
+                    val expression = trigrams(signal).joinToString(
+                        separator = " ",
+                    ) { gram -> "\"$gram\"" }
+                    db.query(
+                        "SELECT memory_id FROM $MEMORY_FTS_TABLE " +
+                            "WHERE grams MATCH ?",
+                        arrayOf(expression),
+                    ).use { cursor ->
+                        val idIndex =
+                            cursor.getColumnIndexOrThrow("memory_id")
+                        while (cursor.moveToNext()) {
+                            result += cursor.getString(idIndex)
+                        }
                     }
                 }
                 result
