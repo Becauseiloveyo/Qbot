@@ -254,6 +254,19 @@ interface QbotDao {
 
     @Query(
         """
+        SELECT * FROM memories
+        WHERE state = :state
+          AND memory_id IN (:memoryIds)
+        ORDER BY memory_id
+        """,
+    )
+    suspend fun memoriesByStateAndIds(
+        state: String,
+        memoryIds: List<String>,
+    ): List<MemoryEntity>
+
+    @Query(
+        """
         UPDATE memories
         SET state = :targetState
         WHERE memory_id = :memoryId AND state = :expectedState

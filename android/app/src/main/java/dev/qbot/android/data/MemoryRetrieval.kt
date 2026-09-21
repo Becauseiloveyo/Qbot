@@ -1,6 +1,7 @@
 package dev.qbot.android.data
 
 import android.icu.lang.UCharacter
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.qbot.android.data.db.MemoryEntity
 import dev.qbot.android.data.db.QbotDatabase
 import java.text.Normalizer
@@ -9,6 +10,8 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 
 private val RETRIEVAL_MEMORY_SCOPES = setOf(
@@ -27,6 +30,10 @@ private val OWNER_SCOPES = setOf(
 private val TERM_PATTERN = Regex(
     "[0-9a-z]+|[\\u3400-\\u4dbf\\u4e00-\\u9fff]+",
 )
+
+private val FTS_SIGNAL_PATTERN = Regex("^[0-9a-z]{3,}$")
+private val ASCII_RUN_PATTERN = Regex("[0-9a-z]+")
+private const val MEMORY_FTS_TABLE = "memory_search_fts"
 
 class MemoryRetrievalError(message: String) : IllegalArgumentException(message)
 
@@ -87,10 +94,16 @@ data class MemoryScoringWeights(
 }
 
 class MemoryRetriever(
-    database: QbotDatabase,
+    private val database: QbotDatabase,
     private val weights: MemoryScoringWeights = MemoryScoringWeights(),
+    private val enableFts: Boolean = true,
 ) {
     private val dao = database.qbotDao()
+    private val ftsMutex = Mutex()
+    private var ftsDisabled = false
+
+    var lastCandidateBackend: String = "scan"
+        private set
 
     init {
         weights.validate()
@@ -105,8 +118,28 @@ class MemoryRetriever(
         val queryEntities = normalizedUnique(query.entities)
         val requiresRelevance = terms.isNotEmpty() || queryEntities.isNotEmpty()
 
+        val candidateIds = ftsCandidateIds(
+            terms = terms,
+            queryEntities = queryEntities,
+        )
+        val candidates =
+            if (candidateIds == null) {
+                lastCandidateBackend = "scan"
+                dao.memoriesByState("PROMOTED")
+            } else {
+                lastCandidateBackend = "fts4"
+                if (candidateIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    dao.memoriesByStateAndIds(
+                        state = "PROMOTED",
+                        memoryIds = candidateIds.toList().sorted(),
+                    )
+                }
+            }
+
         val hits = mutableListOf<MemoryHit>()
-        for (entity in dao.memoriesByState("PROMOTED")) {
+        for (entity in candidates) {
             if (entity.scope !in scopes) continue
             if (entity.trust < query.minTrust) continue
             if (!domainMatches(entity, query)) continue
@@ -150,6 +183,144 @@ class MemoryRetriever(
             .sortedWith(hitComparator)
             .take(query.limit)
     }
+
+    private suspend fun ftsCandidateIds(
+        terms: List<String>,
+        queryEntities: List<String>,
+    ): Set<String>? {
+        if (!enableFts || ftsDisabled) return null
+
+        val signals = ftsSignals(terms, queryEntities) ?: return null
+        return ftsMutex.withLock {
+            if (ftsDisabled) return@withLock null
+            try {
+                val db = database.openHelper.writableDatabase
+                ensureFtsTable(db)
+
+                val memoryCount = scalarCount(
+                    db,
+                    "SELECT COUNT(*) FROM memories",
+                )
+                val indexCount = scalarCount(
+                    db,
+                    "SELECT COUNT(*) FROM $MEMORY_FTS_TABLE",
+                )
+                if (memoryCount != indexCount) {
+                    rebuildFts(db)
+                }
+
+                val expression = signals.joinToString(" OR ") { signal ->
+                    val grams = trigrams(signal)
+                    grams.joinToString(
+                        separator = " AND ",
+                        prefix = "(",
+                        postfix = ")",
+                    ) { gram -> "\"$gram\"" }
+                }
+
+                val result = linkedSetOf<String>()
+                db.query(
+                    "SELECT memory_id FROM $MEMORY_FTS_TABLE " +
+                        "WHERE grams MATCH ?",
+                    arrayOf(expression),
+                ).use { cursor ->
+                    val idIndex = cursor.getColumnIndexOrThrow("memory_id")
+                    while (cursor.moveToNext()) {
+                        result += cursor.getString(idIndex)
+                    }
+                }
+                result
+            } catch (_: Exception) {
+                ftsDisabled = true
+                null
+            }
+        }
+    }
+
+    private fun ftsSignals(
+        terms: List<String>,
+        queryEntities: List<String>,
+    ): List<String>? {
+        val signals = linkedSetOf<String>()
+        signals += terms
+        signals += queryEntities
+        if (signals.isEmpty()) return null
+        if (signals.any { FTS_SIGNAL_PATTERN.matches(it).not() }) {
+            return null
+        }
+        return signals.toList()
+    }
+
+    private fun ensureFtsTable(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS $MEMORY_FTS_TABLE " +
+                "USING fts4(memory_id, grams, tokenize=simple)",
+        )
+    }
+
+    private fun rebuildFts(db: SupportSQLiteDatabase) {
+        db.beginTransaction()
+        try {
+            db.execSQL("DELETE FROM $MEMORY_FTS_TABLE")
+            db.query(
+                "SELECT memory_id, content, entities_json " +
+                    "FROM memories ORDER BY memory_id",
+            ).use { cursor ->
+                val idIndex = cursor.getColumnIndexOrThrow("memory_id")
+                val contentIndex = cursor.getColumnIndexOrThrow("content")
+                val entitiesIndex =
+                    cursor.getColumnIndexOrThrow("entities_json")
+                while (cursor.moveToNext()) {
+                    val memoryId = cursor.getString(idIndex)
+                    val content = cursor.getString(contentIndex)
+                    val entities = decodeEntities(
+                        cursor.getString(entitiesIndex),
+                    )
+                    val searchable = normalizeText(
+                        buildList {
+                            add(content)
+                            addAll(entities)
+                        }.joinToString(" "),
+                    )
+                    val grams = gramDocument(searchable)
+                    db.execSQL(
+                        "INSERT INTO $MEMORY_FTS_TABLE" +
+                            "(memory_id, grams) VALUES (?, ?)",
+                        arrayOf(memoryId, grams),
+                    )
+                }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    private fun gramDocument(value: String): String =
+        ASCII_RUN_PATTERN
+            .findAll(value)
+            .flatMap { match ->
+                trigrams(match.value).asSequence()
+            }
+            .distinct()
+            .joinToString(" ")
+
+    private fun trigrams(value: String): List<String> {
+        if (value.length < 3) return emptyList()
+        return buildList {
+            for (index in 0..value.length - 3) {
+                add(value.substring(index, index + 3))
+            }
+        }.distinct()
+    }
+
+    private fun scalarCount(
+        db: SupportSQLiteDatabase,
+        sql: String,
+    ): Int =
+        db.query(sql).use { cursor ->
+            if (!cursor.moveToFirst()) 0 else cursor.getInt(0)
+        }
 
     private fun validateQuery(query: MemoryQuery): Set<String> {
         if (query.scopes.isEmpty()) {

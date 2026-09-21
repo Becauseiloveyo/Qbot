@@ -146,3 +146,13 @@ Decision: Desktop v0.7 may maintain a derived SQLite FTS5 `memory_search_fts` vi
 The authoritative `memories` table remains the source of truth. After FTS candidate IDs are selected, Qbot reapplies all PROMOTED/state, scope/domain, trust, temporal, relevance, integer scoring, and tie-break rules from ADR-021. The derived index is lazily rebuilt when append-only Memory row count diverges from the index row count. Failure to create/query FTS5 disables acceleration for that retriever instance and must not put the database into Safe Mode.
 
 Reason: FTS should improve candidate discovery cost without creating a new authority boundary or making runtime correctness depend on a particular SQLite build. Keeping it derived and fail-open-to-scan preserves cross-runtime semantics and allows backups/migrations to remain valid even when FTS5/trigram support is absent.
+
+## ADR-023 — Android FTS is a Room-backed disposable 3-gram index
+
+Decision: Android v0.7 mirrors the Desktop FTS accelerator boundary inside the Room-managed SQLite file without adding an authoritative Room Entity or schema migration. `MemoryRetriever` may lazily create a disposable FTS4 virtual table named `memory_search_fts`. Its indexed document is a set of overlapping ASCII 3-grams derived from the same NFKC + Unicode case-fold normalized Memory content/entities used by ADR-021.
+
+Acceleration is attempted only when every normalized relevance signal is ASCII alphanumeric and at least three characters long. Each signal is translated to an AND group of its 3-grams, while multiple signals are ORed to obtain a candidate superset. Short, non-ASCII, structured, empty, unsupported, or FTS-error queries use the deterministic scan path. Candidate IDs are then reloaded from the authoritative `memories` table and all ADR-021 state/domain/trust/temporal/relevance/scoring/tie-break rules are reapplied unchanged.
+
+The virtual table is derived state: it may be deleted or rebuilt, is excluded from Room schema versioning/export, and row-count divergence after append-only Memory growth triggers lazy rebuild. Failure to create or query FTS4 disables acceleration for that retriever instance without changing authoritative state.
+
+Reason: Android's broadly available FTS4 tokenizer does not provide the same native trigram tokenizer as Desktop SQLite FTS5. Explicit normalized 3-gram documents preserve substring candidate semantics while keeping the index non-authoritative, cross-runtime results deterministic, and Room schema v2 unchanged.

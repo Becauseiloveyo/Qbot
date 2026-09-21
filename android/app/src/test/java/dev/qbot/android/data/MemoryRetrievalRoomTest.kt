@@ -393,9 +393,24 @@ class MemoryRetrievalRoomTest {
                 minTrust = rawQuery.getDouble("min_trust"),
                 limit = rawQuery.getInt("limit"),
             )
-            val hits = retriever.retrieve(
+            val evaluationTime = Instant.parse(
+                fixtureCase.getString("evaluation_time"),
+            )
+            val indexedRetriever = MemoryRetriever(
+                database = database,
+                enableFts = true,
+            )
+            val scanRetriever = MemoryRetriever(
+                database = database,
+                enableFts = false,
+            )
+            val indexedHits = indexedRetriever.retrieve(
                 query = query,
-                now = Instant.parse(fixtureCase.getString("evaluation_time")),
+                now = evaluationTime,
+            )
+            val scanHits = scanRetriever.retrieve(
+                query = query,
+                now = evaluationTime,
             )
             val expected = fixtureCase
                 .getJSONObject("expect")
@@ -404,12 +419,23 @@ class MemoryRetrievalRoomTest {
             assertEquals(
                 "case ${fixtureCase.getString("case_id")} hit count",
                 expected.length(),
-                hits.size,
+                indexedHits.size,
             )
+            assertEquals(
+                scanHits.map { it.record.memoryId },
+                indexedHits.map { it.record.memoryId },
+            )
+            assertEquals(
+                scanHits.map { it.score },
+                indexedHits.map { it.score },
+            )
+            assertEquals("fts4", indexedRetriever.lastCandidateBackend)
+            assertEquals("scan", scanRetriever.lastCandidateBackend)
+
             for (hitIndex in 0 until expected.length()) {
                 val expectedHit = expected.getJSONObject(hitIndex)
                 val expectedScore = expectedHit.getJSONObject("score")
-                val hit = hits[hitIndex]
+                val hit = indexedHits[hitIndex]
                 assertEquals(expectedHit.getString("memory_id"), hit.record.memoryId)
                 assertEquals(expectedScore.getInt("total_points"), hit.score.totalPoints)
                 assertEquals(expectedScore.getInt("keyword_milli"), hit.score.keywordMilli)
@@ -419,6 +445,106 @@ class MemoryRetrievalRoomTest {
                 assertEquals(expectedScore.getInt("trust_milli"), hit.score.trustMilli)
             }
         }
+    }
+
+    @Test
+    fun ftsFallsBackForShortNonAsciiQuery() = runBlocking {
+        val wanted = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-cjk",
+            content = "会议安排已经确认",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-cjk",
+        )
+
+        val hits = retriever.retrieve(
+            MemoryQuery(
+                scopes = listOf("CONVERSATION_MEMORY"),
+                conversationId = "conv-cjk",
+                text = "会议",
+            ),
+            now = now,
+        )
+
+        assertEquals(
+            listOf(wanted.memoryId),
+            hits.map { it.record.memoryId },
+        )
+        assertEquals("scan", retriever.lastCandidateBackend)
+    }
+
+    @Test
+    fun ftsIndexRebuildsAfterAppendOnlyMemoryGrowth() = runBlocking {
+        val first = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-growth",
+            content = "alpha release note",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-growth-1",
+        )
+        val query = MemoryQuery(
+            scopes = listOf("CONVERSATION_MEMORY"),
+            conversationId = "conv-growth",
+            text = "alpha",
+        )
+
+        val firstHits = retriever.retrieve(query, now)
+        assertEquals(
+            listOf(first.memoryId),
+            firstHits.map { it.record.memoryId },
+        )
+        assertEquals("fts4", retriever.lastCandidateBackend)
+
+        val second = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-growth",
+            content = "alpha followup",
+            sourceType = "USER_SELF",
+            trust = 1.0,
+            sourceEventId = "evt-growth-2",
+        )
+        val secondHits = retriever.retrieve(query, now)
+
+        assertEquals(
+            setOf(first.memoryId, second.memoryId),
+            secondHits.map { it.record.memoryId }.toSet(),
+        )
+        assertEquals("fts4", retriever.lastCandidateBackend)
+    }
+
+    @Test
+    fun explicitScanModeMatchesIndexedMode() = runBlocking {
+        val wanted = promote(
+            scope = "CONVERSATION_MEMORY",
+            conversationId = "conv-scan",
+            content = "stable keyword memory",
+            sourceType = "USER_SELF",
+            trust = 0.8,
+            importance = 0.7,
+            sourceEventId = "evt-scan",
+        )
+        val query = MemoryQuery(
+            scopes = listOf("CONVERSATION_MEMORY"),
+            conversationId = "conv-scan",
+            text = "keyword",
+        )
+
+        val indexed = retriever.retrieve(query, now)
+        val scanRetriever = MemoryRetriever(
+            database = database,
+            enableFts = false,
+        )
+        val scanned = scanRetriever.retrieve(query, now)
+
+        assertEquals(
+            listOf(wanted.memoryId),
+            indexed.map { it.record.memoryId },
+        )
+        assertEquals(indexed, scanned)
+        assertEquals("fts4", retriever.lastCandidateBackend)
+        assertEquals("scan", scanRetriever.lastCandidateBackend)
     }
 
     private fun nullableString(value: JSONObject, key: String): String? =
