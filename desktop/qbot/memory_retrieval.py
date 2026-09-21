@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Mapping, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from qbot.persistence.database import Database
 from qbot.persistence.memory import MEMORY_SCOPES, MemoryRecord
@@ -74,6 +75,8 @@ class MemoryScoringWeights:
 
 _WORD_RE = re.compile(r"[0-9a-z]+|[\u3400-\u4dbf\u4e00-\u9fff]+")
 _OWNER_SCOPES = {"USER_PERSONA", "CONTACT_PROFILE"}
+_FTS_SIGNAL_RE = re.compile(r"^[0-9a-z]{3,}$")
+_FTS_TABLE = "memory_search_fts"
 
 
 class MemoryRetriever:
@@ -89,10 +92,14 @@ class MemoryRetriever:
         database: Database,
         *,
         weights: MemoryScoringWeights | None = None,
+        enable_fts: bool = True,
     ) -> None:
         self.database = database
         self.weights = weights or MemoryScoringWeights()
         self.weights.validate()
+        self.enable_fts = bool(enable_fts)
+        self._fts_disabled = False
+        self.last_candidate_backend = "scan"
 
     def retrieve(
         self,
@@ -106,6 +113,10 @@ class MemoryRetriever:
         query_entities = _normalized_unique(query.entities)
         requires_relevance = bool(terms or query_entities)
 
+        candidate_ids = self._fts_candidate_ids(
+            terms=terms,
+            query_entities=query_entities,
+        )
         statement = (
             select(memories)
             .where(
@@ -115,6 +126,16 @@ class MemoryRetriever:
             )
             .order_by(memories.c.memory_id.asc())
         )
+        if candidate_ids is not None:
+            self.last_candidate_backend = "fts5"
+            if not candidate_ids:
+                return []
+            statement = statement.where(
+                memories.c.memory_id.in_(candidate_ids)
+            )
+        else:
+            self.last_candidate_backend = "scan"
+
         with self.database.engine.connect() as conn:
             rows = conn.execute(statement).mappings().all()
 
@@ -159,6 +180,100 @@ class MemoryRetriever:
 
         hits.sort(key=self._sort_key)
         return hits[: query.limit]
+
+    def _fts_candidate_ids(
+        self,
+        *,
+        terms: tuple[str, ...],
+        query_entities: tuple[str, ...],
+    ) -> set[str] | None:
+        if not self.enable_fts or self._fts_disabled or self.database.safe_mode:
+            return None
+
+        signals = self._fts_signals(terms, query_entities)
+        if signals is None:
+            return None
+
+        try:
+            with self.database.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "CREATE VIRTUAL TABLE IF NOT EXISTS "
+                        f"{_FTS_TABLE} USING fts5("
+                        "memory_id UNINDEXED, searchable, tokenize='trigram'"
+                        ")"
+                    )
+                )
+
+                memory_count = conn.execute(
+                    select(func.count()).select_from(memories)
+                ).scalar_one()
+                index_count = conn.execute(
+                    text(f"SELECT COUNT(*) FROM {_FTS_TABLE}")
+                ).scalar_one()
+
+                if int(memory_count) != int(index_count):
+                    self._rebuild_fts(conn)
+
+                expression = " OR ".join(
+                    f'"{signal}"' for signal in signals
+                )
+                rows = conn.execute(
+                    text(
+                        f"SELECT memory_id FROM {_FTS_TABLE} "
+                        "WHERE searchable MATCH :expression"
+                    ),
+                    {"expression": expression},
+                ).scalars().all()
+            return {str(memory_id) for memory_id in rows}
+        except SQLAlchemyError:
+            self._fts_disabled = True
+            return None
+
+    @staticmethod
+    def _fts_signals(
+        terms: tuple[str, ...],
+        query_entities: tuple[str, ...],
+    ) -> tuple[str, ...] | None:
+        signals = tuple(dict.fromkeys((*terms, *query_entities)))
+        if not signals:
+            return None
+        if any(_FTS_SIGNAL_RE.fullmatch(signal) is None for signal in signals):
+            return None
+        return signals
+
+    @staticmethod
+    def _rebuild_fts(conn) -> None:
+        conn.execute(text(f"DELETE FROM {_FTS_TABLE}"))
+        rows = conn.execute(
+            select(
+                memories.c.memory_id,
+                memories.c.content,
+                memories.c.entities_json,
+            ).order_by(memories.c.memory_id.asc())
+        ).mappings().all()
+        for row in rows:
+            raw_entities = json.loads(str(row["entities_json"] or "[]"))
+            if not isinstance(raw_entities, list):
+                raw_entities = []
+            searchable = _normalize_text(
+                " ".join(
+                    (
+                        str(row["content"]),
+                        *(str(value) for value in raw_entities),
+                    )
+                )
+            )
+            conn.execute(
+                text(
+                    f"INSERT INTO {_FTS_TABLE}(memory_id, searchable) "
+                    "VALUES (:memory_id, :searchable)"
+                ),
+                {
+                    "memory_id": str(row["memory_id"]),
+                    "searchable": searchable,
+                },
+            )
 
     @staticmethod
     def _validate_query(query: MemoryQuery) -> tuple[str, ...]:

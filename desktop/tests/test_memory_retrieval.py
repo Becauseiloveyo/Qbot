@@ -327,6 +327,9 @@ class MemoryRetrievalTests(unittest.TestCase):
                     )
                 )
 
+        scan_retriever = MemoryRetriever(self.db, enable_fts=False)
+        indexed_retriever = MemoryRetriever(self.db, enable_fts=True)
+
         for case in fixture["given"]["retrieval_cases"]:
             with self.subTest(case_id=case["case_id"]):
                 raw_query = case["query"]
@@ -343,14 +346,27 @@ class MemoryRetrievalTests(unittest.TestCase):
                 now = datetime.fromisoformat(
                     case["evaluation_time"].replace("Z", "+00:00")
                 )
-                hits = self.retriever.retrieve(query, now=now)
+                scan_hits = scan_retriever.retrieve(query, now=now)
+                indexed_hits = indexed_retriever.retrieve(query, now=now)
                 expected = case["expect"]["hits"]
 
                 self.assertEqual(
                     [item["memory_id"] for item in expected],
-                    [hit.record.memory_id for hit in hits],
+                    [hit.record.memory_id for hit in scan_hits],
                 )
-                for hit, expected_hit in zip(hits, expected, strict=True):
+                self.assertEqual(
+                    [hit.record.memory_id for hit in scan_hits],
+                    [hit.record.memory_id for hit in indexed_hits],
+                )
+                self.assertEqual(
+                    [hit.score for hit in scan_hits],
+                    [hit.score for hit in indexed_hits],
+                )
+                self.assertEqual(
+                    indexed_retriever.last_candidate_backend,
+                    "fts5",
+                )
+                for hit, expected_hit in zip(indexed_hits, expected, strict=True):
                     expected_score = expected_hit["score"]
                     self.assertEqual(expected_score["total_points"], hit.score.total_points)
                     self.assertEqual(expected_score["keyword_milli"], hit.score.keyword_milli)
@@ -358,6 +374,89 @@ class MemoryRetrievalTests(unittest.TestCase):
                     self.assertEqual(expected_score["recency_milli"], hit.score.recency_milli)
                     self.assertEqual(expected_score["importance_milli"], hit.score.importance_milli)
                     self.assertEqual(expected_score["trust_milli"], hit.score.trust_milli)
+
+
+
+    def test_fts_falls_back_for_short_non_ascii_query(self) -> None:
+        wanted = self._promote(
+            scope="CONVERSATION_MEMORY",
+            conversation_id="conv-cjk",
+            content="会议安排已经确认",
+            source_type="USER_SELF",
+            trust=1.0,
+            source_event_id="evt-cjk",
+        )
+
+        hits = self.retriever.retrieve(
+            MemoryQuery(
+                scopes=("CONVERSATION_MEMORY",),
+                conversation_id="conv-cjk",
+                text="会议",
+            ),
+            now=NOW,
+        )
+
+        self.assertEqual([wanted.memory_id], [hit.record.memory_id for hit in hits])
+        self.assertEqual(self.retriever.last_candidate_backend, "scan")
+
+    def test_fts_index_rebuilds_after_append_only_memory_growth(self) -> None:
+        first = self._promote(
+            scope="CONVERSATION_MEMORY",
+            conversation_id="conv-growth",
+            content="alpha release note",
+            source_type="USER_SELF",
+            trust=1.0,
+            source_event_id="evt-growth-1",
+        )
+        query = MemoryQuery(
+            scopes=("CONVERSATION_MEMORY",),
+            conversation_id="conv-growth",
+            text="alpha",
+        )
+
+        first_hits = self.retriever.retrieve(query, now=NOW)
+        self.assertEqual([first.memory_id], [hit.record.memory_id for hit in first_hits])
+        self.assertEqual(self.retriever.last_candidate_backend, "fts5")
+
+        second = self._promote(
+            scope="CONVERSATION_MEMORY",
+            conversation_id="conv-growth",
+            content="alpha followup",
+            source_type="USER_SELF",
+            trust=1.0,
+            source_event_id="evt-growth-2",
+        )
+        second_hits = self.retriever.retrieve(query, now=NOW)
+
+        self.assertEqual(
+            {first.memory_id, second.memory_id},
+            {hit.record.memory_id for hit in second_hits},
+        )
+        self.assertEqual(self.retriever.last_candidate_backend, "fts5")
+
+    def test_explicit_scan_mode_matches_indexed_mode(self) -> None:
+        wanted = self._promote(
+            scope="CONVERSATION_MEMORY",
+            conversation_id="conv-scan",
+            content="stable keyword memory",
+            source_type="USER_SELF",
+            trust=0.8,
+            importance=0.7,
+            source_event_id="evt-scan",
+        )
+        query = MemoryQuery(
+            scopes=("CONVERSATION_MEMORY",),
+            conversation_id="conv-scan",
+            text="keyword",
+        )
+        indexed = self.retriever.retrieve(query, now=NOW)
+        scan_retriever = MemoryRetriever(self.db, enable_fts=False)
+        scanned = scan_retriever.retrieve(query, now=NOW)
+
+        self.assertEqual([wanted.memory_id], [hit.record.memory_id for hit in indexed])
+        self.assertEqual(indexed, scanned)
+        self.assertEqual(self.retriever.last_candidate_backend, "fts5")
+        self.assertEqual(scan_retriever.last_candidate_backend, "scan")
 
 
 

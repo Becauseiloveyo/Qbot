@@ -138,3 +138,11 @@ Decision: Qbot v0.7 freezes memory eligibility and ranking independently from an
 SQLite FTS5 and later semantic/embedding scorers are candidate accelerators or additional pluggable relevance signals only. They may not make CANDIDATE/REJECTED/SUPERSEDED memories eligible, bypass trust/domain boundaries, or change Active Task/Checkpoint force-loading.
 
 Reason: Android and Desktop must be able to reproduce the same memory selection before backend-specific indexing is introduced. Integer scoring and explicit domain filters reduce cross-runtime drift, while separating eligibility from acceleration prevents an FTS/vector index from becoming an accidental authority boundary.
+
+## ADR-022 — Desktop FTS5 is a disposable candidate accelerator
+
+Decision: Desktop v0.7 may maintain a derived SQLite FTS5 `memory_search_fts` virtual table containing NFKC + case-fold normalized Memory content/entities. The index is not part of the authoritative schema version and may be deleted/rebuilt at any time. FTS is used only when all relevance signals are simple normalized ASCII alphanumeric strings of at least three characters, allowing the trigram tokenizer to provide a candidate superset for ADR-021 substring/entity relevance. Short, non-ASCII, structured, empty, unsupported, or FTS-error queries fall back to the deterministic scan path.
+
+The authoritative `memories` table remains the source of truth. After FTS candidate IDs are selected, Qbot reapplies all PROMOTED/state, scope/domain, trust, temporal, relevance, integer scoring, and tie-break rules from ADR-021. The derived index is lazily rebuilt when append-only Memory row count diverges from the index row count. Failure to create/query FTS5 disables acceleration for that retriever instance and must not put the database into Safe Mode.
+
+Reason: FTS should improve candidate discovery cost without creating a new authority boundary or making runtime correctness depend on a particular SQLite build. Keeping it derived and fail-open-to-scan preserves cross-runtime semantics and allows backups/migrations to remain valid even when FTS5/trigram support is absent.
