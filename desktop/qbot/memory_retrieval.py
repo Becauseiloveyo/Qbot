@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Mapping, Sequence
 
@@ -13,6 +13,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from qbot.persistence.database import Database
 from qbot.persistence.memory import MEMORY_SCOPES, MemoryRecord
 from qbot.persistence.tables import memories
+from qbot.semantic_memory import (
+    SemanticAudit,
+    SemanticCandidate,
+    SemanticRelevanceScorer,
+    SemanticScoreStatus,
+    SemanticScorerUnavailable,
+    SemanticScoringRequest,
+)
 
 
 class MemoryRetrievalError(ValueError):
@@ -49,6 +57,7 @@ class MemoryScore:
 class MemoryHit:
     record: MemoryRecord
     score: MemoryScore
+    semantic: SemanticAudit | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +189,117 @@ class MemoryRetriever:
 
         hits.sort(key=self._sort_key)
         return hits[: query.limit]
+
+    async def retrieve_with_semantics(
+        self,
+        query: MemoryQuery,
+        *,
+        scorer: SemanticRelevanceScorer | None = None,
+        now: datetime | None = None,
+    ) -> list[MemoryHit]:
+        """Attach advisory semantic scores without changing deterministic hits.
+
+        Eligibility, IDs, ordering, limit, and deterministic score components
+        are fixed before the semantic scorer is called. Scorer absence,
+        unavailability, invalid output, or failure returns the same hits with
+        audit metadata only.
+        """
+
+        hits = self.retrieve(query, now=now)
+        if not hits:
+            return hits
+
+        if scorer is None:
+            audit = SemanticAudit(status=SemanticScoreStatus.DISABLED)
+            return [replace(hit, semantic=audit) for hit in hits]
+
+        provider = scorer.provider_name.strip() or type(scorer).__name__
+        model = scorer.model_name
+        request = SemanticScoringRequest(
+            query_text=_normalize_text(query.text),
+            query_entities=_normalized_unique(query.entities),
+            candidates=tuple(
+                SemanticCandidate(
+                    memory_id=hit.record.memory_id,
+                    content=hit.record.content,
+                    entities=hit.record.entities,
+                )
+                for hit in hits
+            ),
+        )
+
+        try:
+            scores = await scorer.score(request)
+            score_by_id = self._validate_semantic_scores(
+                scores=scores,
+                eligible_ids={hit.record.memory_id for hit in hits},
+            )
+        except SemanticScorerUnavailable as exc:
+            audit = SemanticAudit(
+                status=SemanticScoreStatus.UNAVAILABLE,
+                provider=provider,
+                model=model,
+                error_type=type(exc).__name__,
+            )
+            return [replace(hit, semantic=audit) for hit in hits]
+        except Exception as exc:
+            audit = SemanticAudit(
+                status=SemanticScoreStatus.FAILED,
+                provider=provider,
+                model=model,
+                error_type=type(exc).__name__,
+            )
+            return [replace(hit, semantic=audit) for hit in hits]
+
+        enriched: list[MemoryHit] = []
+        for hit in hits:
+            score_milli = score_by_id.get(hit.record.memory_id)
+            enriched.append(
+                replace(
+                    hit,
+                    semantic=SemanticAudit(
+                        status=(
+                            SemanticScoreStatus.SCORED
+                            if score_milli is not None
+                            else SemanticScoreStatus.MISSING
+                        ),
+                        provider=provider,
+                        model=model,
+                        score_milli=score_milli,
+                    ),
+                )
+            )
+        return enriched
+
+    @staticmethod
+    def _validate_semantic_scores(
+        *,
+        scores,
+        eligible_ids: set[str],
+    ) -> dict[str, int]:
+        result: dict[str, int] = {}
+        for item in scores:
+            if item.memory_id not in eligible_ids:
+                raise MemoryRetrievalError(
+                    "semantic scorer returned an ineligible memory_id"
+                )
+            if item.memory_id in result:
+                raise MemoryRetrievalError(
+                    "semantic scorer returned duplicate memory_id"
+                )
+            if isinstance(item.score_milli, bool) or not isinstance(
+                item.score_milli,
+                int,
+            ):
+                raise MemoryRetrievalError(
+                    "semantic score_milli must be an integer"
+                )
+            if item.score_milli < 0 or item.score_milli > 1000:
+                raise MemoryRetrievalError(
+                    "semantic score_milli must be between 0 and 1000"
+                )
+            result[item.memory_id] = item.score_milli
+        return result
 
     def _fts_candidate_ids(
         self,

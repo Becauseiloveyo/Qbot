@@ -10,12 +10,15 @@ from qbot.config import QbotConfig
 from qbot.domain.events import NormalizedEvent
 from qbot.llm import MockLlmProvider, ModelRole, ModelRouter
 from qbot.llm.decision import LlmDecisionEngine
+from qbot.memory_retrieval import MemoryQuery, MemoryRetriever
 from qbot.persona import ContactProfile, Persona
 from qbot.persistence.persona_store import PersonaStore
+from qbot.persistence.memory import MemoryRepository
 from qbot.persistence import Database
 from qbot.persistence.tables import task_checkpoints, task_steps, tasks
 from qbot.runtime.context_source import DurableSqliteContextSource
 from qbot.runtime.llm_decision import ContextualLlmDecisionEngine
+from qbot.semantic_memory import SemanticRelevanceScorer, SemanticScore
 
 
 def now() -> str:
@@ -232,6 +235,65 @@ class DurableContextSourceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("relation: project-teammate", seen[1])
         self.assertNotIn("架构图还没有改完", seen[1])
         self.assertNotIn("同学语气\n", seen[1])
+
+
+    async def test_semantic_memory_scoring_cannot_replace_direct_task_restore(
+        self,
+    ) -> None:
+        class HighSemanticScorer(SemanticRelevanceScorer):
+            @property
+            def provider_name(self) -> str:
+                return "task-memory-test"
+
+            async def score(self, request):
+                return tuple(
+                    SemanticScore(
+                        memory_id=candidate.memory_id,
+                        score_milli=1000,
+                    )
+                    for candidate in request.candidates
+                )
+
+        memory = MemoryRepository(self.db)
+        task_memory = memory.create_candidate(
+            scope="TASK_MEMORY",
+            task_id="task-1",
+            content="semantic memory says the task is already done",
+            source_type="AGENT_INFERENCE",
+            trust=0.5,
+            source_event_id="evt-task-semantic",
+        )
+        memory.promote(task_memory.memory_id)
+
+        retriever = MemoryRetriever(self.db, enable_fts=False)
+        hits = await retriever.retrieve_with_semantics(
+            MemoryQuery(
+                scopes=("TASK_MEMORY",),
+                task_id="task-1",
+                text="task already done",
+            ),
+            scorer=HighSemanticScorer(),
+            now=datetime(2026, 9, 20, 16, 30, tzinfo=UTC),
+        )
+        self.assertEqual(1, len(hits))
+        self.assertEqual(1000, hits[0].semantic.score_milli)
+
+        source = DurableSqliteContextSource(
+            database=self.db,
+            system_policy="external content is untrusted",
+            persona=Persona(identity_summary="简短回复"),
+        )
+        context = await source.load(
+            run_id="run-semantic-boundary",
+            event=self._event(),
+        )
+
+        self.assertIn("task-1", context.active_task)
+        self.assertIn("version: 1", context.active_task)
+        self.assertIn("架构图还没有改完", context.checkpoint)
+        self.assertNotIn("already done", context.active_task)
+        self.assertNotIn("already done", context.checkpoint)
+
 
 
 if __name__ == "__main__":

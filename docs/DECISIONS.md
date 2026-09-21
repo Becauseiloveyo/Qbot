@@ -156,3 +156,11 @@ Acceleration is attempted only when every normalized relevance signal is ASCII a
 The virtual table is derived state: it may be deleted or rebuilt, is excluded from Room schema versioning/export, and row-count divergence after append-only Memory growth triggers lazy rebuild. Failure to create or query FTS4 disables acceleration for that retriever instance without changing authoritative state.
 
 Reason: Android's broadly available FTS4 tokenizer does not provide the same native trigram tokenizer as Desktop SQLite FTS5. Explicit normalized 3-gram documents preserve substring candidate semantics while keeping the index non-authoritative, cross-runtime results deterministic, and Room schema v2 unchanged.
+
+## ADR-024 — Semantic memory scoring is advisory and cannot change deterministic retrieval
+
+Decision: v0.7 introduces a provider-neutral asynchronous `SemanticRelevanceScorer` contract only after ADR-021 deterministic eligibility and ordering have completed. The scorer receives only the already-selected deterministic Memory hits and may return an integer `score_milli` (0-1000) plus runtime provider/model provenance. Semantic scores are audit metadata in this milestone: they do not add, remove, reorder, promote, persist, or otherwise mutate Memory, and they do not contribute to the frozen ADR-021 `total_points`.
+
+The semantic path is explicit opt-in through `retrieve_with_semantics()`. With no scorer configured it returns the same deterministic hits marked DISABLED. An intentionally unavailable backend returns the same hits marked UNAVAILABLE. Provider exceptions, duplicate IDs, unknown/ineligible IDs, non-integer scores, and scores outside 0-1000 fail closed to semantic metadata marked FAILED; deterministic IDs, ordering, and scores are preserved. Active Task/Checkpoint restoration remains a separate direct durable-state path and is never supplied to the semantic scorer.
+
+Reason: embedding providers are optional, failure-prone, and may differ across platforms/models. Freezing a non-authoritative scorer contract first provides semantic observability without weakening trust/domain boundaries or making core correctness depend on embeddings. Any future semantic reranking or score fusion requires a separate explicit decision and cross-runtime contract rather than silently changing ADR-021 ranking semantics.
