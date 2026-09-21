@@ -227,11 +227,20 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - Android retrieval tests now prove indexed == scan against the shared cross-runtime fixture, explicit scan mode, short/non-ASCII fallback, and index rebuild after Memory growth.
 - Initial Android FTS query-composition attempts exposed FTS4 parser differences; final per-signal union implementation passed on `5beb91f`.
 - Android FTS checkpoint passed: Android Tests #243, Desktop Tests #517, and Conformance #543 all succeeded; Android Room schema verification/upload also passed.
+- Added provider-neutral asynchronous `SemanticRelevanceScorer` contract on Desktop with integer `score_milli` (0-1000), explicit candidate/request records, and runtime provider/model provenance.
+- Added explicit `retrieve_with_semantics()` opt-in path. Semantic scoring runs only after ADR-021 deterministic retrieval has fixed eligibility, IDs, ordering, limit, and deterministic score components.
+- Semantic scores are advisory metadata only in v0.7: they do not add/remove/reorder Memory, do not contribute to deterministic `total_points`, do not persist, and do not mutate authoritative state.
+- No scorer configured returns the same deterministic hits marked DISABLED; the deterministic `NoopSemanticRelevanceScorer` returns the same hits marked UNAVAILABLE.
+- Semantic provider failures and invalid output (unknown/ineligible IDs, duplicate IDs, non-integer or out-of-range scores) fail closed to semantic metadata marked FAILED while preserving deterministic IDs/order/scores.
+- Added Desktop semantic tests proving reverse/high semantic scores cannot reorder deterministic hits, missing/unavailable/failing backends are no-op for correctness, and semantic scorers never receive CANDIDATE or wrong-domain Memory.
+- Added a direct-state regression proving semantic scoring cannot replace or mutate Active Task/Checkpoint restoration through `DurableSqliteContextSource`.
+- ADR-024 records the advisory semantic authority boundary; no database or persistence schema change was required.
+- Semantic contract checkpoint passed on `a171656`: Desktop Tests #521 ran 98/98 successfully, Android Tests #245 passed with Room schema verify/upload, and Conformance #547 passed.
 
 ## In progress
 
-- Add semantic retrieval only as a pluggable, non-authoritative relevance scorer after deterministic + FTS retrieval are stable on both runtimes.
-- Freeze semantic scorer interfaces/fallback behavior so embeddings can never bypass ADR-021 eligibility, trust/domain boundaries, temporal validity, or Active Task/Checkpoint direct loading.
+- Mirror the frozen advisory semantic scorer contract on Android without adding embedding persistence or changing Room schema.
+- Add cross-runtime semantic contract fixtures/tests for status, score provenance, invalid-output fallback, and preservation of deterministic IDs/order where practical.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
@@ -268,13 +277,13 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Define a provider-neutral semantic relevance scorer contract whose output is advisory and cannot alter ADR-021 eligibility; include deterministic no-op/fallback behavior when no embedding backend is configured.
-2. Integrate the semantic scorer into Desktop retrieval behind an explicit opt-in path, with deterministic retrieval/FTS remaining sufficient for correctness and with score provenance exposed for audit.
-3. Add tests proving semantic scorer failure/unavailability cannot remove mandatory deterministic results, cannot admit ineligible memories, and cannot change Active Task/Checkpoint loading.
-4. Mirror the stable semantic scorer contract on Android only after Desktop behavior is frozen, then add cross-runtime contract fixtures where practical.
+1. Mirror ADR-024 on Android with provider-neutral async semantic request/candidate/score/audit types and an explicit semantic retrieval path that preserves deterministic IDs/order/scores.
+2. Add Android tests for DISABLED/UNAVAILABLE/FAILED/SCORED semantics, malicious/invalid scorer output, and proof that only ADR-021-eligible Memory is exposed to the semantic scorer.
+3. Add a shared semantic contract fixture or equivalent conformance checks so Desktop and Android agree on score/status validation and fallback semantics without requiring identical embedding models.
+4. Add background candidate extraction/summarization only after durable staging/promotion and all retrieval layers work independently.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
-6. Add background candidate extraction/summarization only after durable staging/promotion and retrieval work independently.
-7. Run v0.7 cross-runtime exit tests and update memory/security documentation.
+6. Run v0.7 cross-runtime exit tests and update memory/security documentation.
+7. Only after v0.7 exits cleanly, advance to v0.8 coordinator/sync work.
 
 ## Resume rule
 
