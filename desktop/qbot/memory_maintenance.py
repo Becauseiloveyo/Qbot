@@ -401,19 +401,16 @@ class MemoryMaintenanceService:
 
     @staticmethod
     def _window_digest(window: tuple[_MessageWindowItem, ...]) -> str:
-        material = json.dumps(
-            [
-                {
-                    "event_id": item.event_id,
-                    "sender_id": item.sender_id,
-                    "text": item.text,
-                    "received_at": item.received_at,
-                }
-                for item in window
-            ],
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
+        material = "\x1e".join(
+            "\x1f".join(
+                (
+                    item.event_id,
+                    item.sender_id or "",
+                    item.text,
+                    item.received_at,
+                )
+            )
+            for item in window
         )
         return hashlib.sha256(material.encode("utf-8")).hexdigest()
 

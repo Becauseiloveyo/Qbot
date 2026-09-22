@@ -318,7 +318,9 @@ Columns:
 - `model`
 - `updated_at`
 
-The source digest is computed from the bounded durable message window and is the idempotency barrier for regeneration. A rolling summary may be replaced when the window changes, but it cannot mutate or supersede System Policy, Persona, Active Task, Checkpoint, or promoted Memory. Model failure leaves the previous summary unchanged.
+The source digest is computed from the bounded durable message window and is the idempotency barrier for regeneration. Desktop and Android use the same canonical source material: ordered records separated by U+001E, with `event_id`, `sender_id`, `text`, and `received_at` separated by U+001F, then SHA-256. A rolling summary may be replaced when the window changes, but it cannot mutate or supersede System Policy, Persona, Active Task, Checkpoint, or promoted Memory. Model failure leaves the previous summary unchanged.
+
+Desktop persists this table in schema v5. Android mirrors it in Room schema v3 with explicit v2 -> v3 migration; destructive fallback remains forbidden.
 
 ## policy_decisions
 

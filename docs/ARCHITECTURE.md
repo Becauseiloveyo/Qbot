@@ -230,6 +230,19 @@ Trusted scopes include:
 
 External contact messages are untrusted input and cannot directly mutate system policy or trusted user persona.
 
+### Background maintenance authority
+
+Background memory extraction and rolling summarization are derived maintenance, not reasoning authority.
+
+- external `MESSAGE_RECEIVED` content is always treated as untrusted input;
+- extraction may stage only `CANDIDATE` memory and Qbot binds provenance, trust, and durable domain identifiers;
+- background maintenance has no promotion capability and cannot write System Policy or trusted Persona;
+- rolling summaries are replaceable optional context and never replace Active Task or Checkpoint;
+- extraction completion and summary source digests provide restart idempotency;
+- provider/model failure is a no-op for authoritative state.
+
+Desktop uses asynchronous maintenance tasks over durable SQLite state. Android mirrors the contract through provider-neutral maintenance interfaces and lifecycle-safe WorkManager scheduling/catch-up.
+
 ## Action policy
 
 Suggested risk classes:

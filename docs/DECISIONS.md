@@ -175,4 +175,8 @@ Rolling conversation summaries are persisted separately in conversation_summarie
 
 Desktop DB schema v5 adds only conversation_summaries. It contains summary text, source digest/window metadata, provider/model provenance, and update time; it has no foreign-key path capable of mutating Task/Checkpoint/Persona/Memory authority.
 
+Android mirrors the same boundary in Room schema v3 with a `conversation_summaries` Entity and provider-neutral `MemoryCandidateExtractor` / `RollingSummarizer` contracts. The maintenance engine validates an entire proposal batch before staging candidates, forces CONTACT provenance and durable event/domain identifiers, and never exposes promotion authority. WorkManager uses unique per-event work plus startup catch-up, but scheduling is a no-op until a real runtime provider factory is configured; Qbot does not install a fake default model backend.
+
+Both runtimes compute the rolling-summary source digest from the same stable ordered message-window material: records separated by U+001E and `event_id / sender_id / text / received_at` fields separated by U+001F, then SHA-256. The digest is derived idempotency metadata, not trusted state.
+
 Reason: background LLM work is useful for long-context compression and candidate discovery, but it is exactly the wrong place to grant implicit authority. Durable provenance binding, candidate-only staging, digest idempotency, and a separate derived-summary store keep model failure or prompt injection from becoming trusted state.

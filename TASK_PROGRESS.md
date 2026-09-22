@@ -1,13 +1,15 @@
 # Qbot Task Progress
 
-Last updated: 2026-09-20
+Last updated: 2026-09-22
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.7 — Hybrid Memory
+Current milestone: v0.7 — Hybrid Memory (COMPLETE)
 Current branch: `feature/v0.7-hybrid-memory`
+Next milestone: v0.8 — PC/Phone Sync + Coordinator
+Development cadence: one user-requested development cycle completes one roadmap minor version (0.1) before advancing; intermediate checkpoints do not end the cycle.
 
 ## Current objective
 
-Build Hybrid Memory as durable, provenance-aware state before retrieval complexity: candidate staging, trust/scope policy, authoritative promotion, append/supersede history, then deterministic keyword/entity/temporal/importance retrieval. Active Task/Checkpoint remains direct-loaded and outside normal memory retrieval.
+v0.7 Hybrid Memory is complete and validated. Preserve the v0.7 authority boundary while preparing the next 0.1 development unit: v0.8 coordinator/sync. Active Task/Checkpoint remains direct-loaded and outside normal memory retrieval.
 
 ## Completed
 
@@ -243,18 +245,23 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - `tools/validate_conformance.py` now independently derives the semantic audit result from the deterministic retrieval case and scorer behavior, so the fixture cannot redefine the authority boundary.
 - Desktop and Android both consume the same semantic contract cases; Desktop shared semantic fixture regression passed as part of 99/99 Desktop tests.
 - Cross-runtime semantic advisory checkpoint passed on `910f779`: Android Tests #248, Desktop Tests #525, and Conformance #551 all succeeded; Android Room schema verify/upload also passed and no persistence schema changed.
+- Added Desktop provider-neutral background Memory maintenance using MEMORY/SUMMARY roles. External message proposals are validated as a full batch, forced to CONTACT provenance/domain IDs/trust, and staged only through `MemoryRepository.create_candidate()`; background code has no promotion authority.
+- Added durable Desktop `conversation_summaries` in schema v5 with explicit v4->v5 migration, bounded-window SHA-256 idempotency, provider/model provenance, restart catch-up, and derived-context rendering below System Policy/Persona/Active Task/Checkpoint.
+- Desktop background maintenance passed restart/idempotency, malicious-scope, invalid-model, migration, and context-precedence tests; Desktop Tests #529 ran 103/103 successfully and Conformance #555 passed on `18a2e44`.
+- Mirrored background maintenance on Android with Room schema v3, explicit v2->v3 migration, provider-neutral extractor/summarizer interfaces, CONTACT provenance binding, candidate-only staging, derived summary persistence, per-event WorkManager unique work, and startup catch-up.
+- Android installs no fake maintenance model backend: WorkManager scheduling is a no-op until a real runtime provider factory is configured; queued work retries provider-unavailable process restarts without gaining authority.
+- Android tests cover candidate-only staging, provenance/trust binding, derived summary persistence, provider failure/no-provider no-op, malicious trusted-scope rejection, repeat/restart idempotency, explicit migration registry, and schedule-on-new-admission only.
+- Android background maintenance checkpoint passed on `ade680a`: Android Tests #252, Desktop Tests #531, and Conformance #557 all succeeded; Room schema v3 verify/upload passed.
+- v0.7 Hybrid Memory deliverables are complete across Desktop and Android: durable staging/provenance, append/supersede, deterministic + FTS retrieval, advisory semantic scoring, background candidate extraction, and rolling summarization, while Active Task/Checkpoint remains direct-loaded.
 
 ## In progress
 
-- Add background candidate extraction and rolling summarization only after durable staging/promotion and deterministic/FTS/semantic retrieval now work independently.
-- Freeze extraction/summarization authority boundaries so model-generated output can only stage CANDIDATE memory and cannot directly promote trusted memory or mutate Active Task/Checkpoint.
-- Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
+- None for v0.7. The milestone is closed; do not start v0.8 feature work on this branch as part of the v0.7 development unit.
 
 ## Not started
 
 - Device-specific verified QQ/TIM Accessibility profile calibration.
 - Persona/contact UI.
-- Background candidate extraction/summarization.
 - Coordinator and phone/PC synchronization.
 - Full management UI.
 
@@ -283,13 +290,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Define a provider-neutral background Memory extraction/summarization contract: input is bounded recent conversation/context, output is candidate proposals only, with explicit provenance/source IDs and no authoritative promotion side effect.
-2. Implement Desktop background candidate extraction first using the existing MEMORY/SUMMARY model roles and `MemoryRepository.create_candidate()`; invalid/model-failed output must be a no-op and contact-originated content must retain untrusted provenance.
-3. Add rolling-summary generation as optional context state that cannot overwrite Active Task/Checkpoint or trusted Persona/System Policy, then add tests for restart/idempotency and poisoning boundaries.
-4. Mirror the stable extraction/summarization contract on Android with lifecycle-safe background execution only after Desktop behavior is frozen.
-5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
-6. Run v0.7 cross-runtime exit tests and update memory/security documentation.
-7. Only after v0.7 exits cleanly, advance to v0.8 coordinator/sync work.
+1. Start the next 0.1 development unit by branching `feature/v0.8-coordinator-sync` from the validated v0.7 head; do not continue feature development on the v0.7 branch.
+2. Freeze the v0.8 coordinator protocol and common contracts first: node identity, writer lease, fencing epoch, optimistic version, sync envelope, conflict/rejection reason, and manual failover state.
+3. Implement Desktop coordinator/single-writer enforcement and durable lease/fencing recovery, then mirror the stable protocol on Android.
+4. Add task/memory/checkpoint sync with explicit ownership/version checks; stale epochs and stale record versions must fail closed rather than last-write-win.
+5. Add manual failover before any automatic failover, with split-brain/concurrency tests and cross-runtime fixtures.
+6. Run the full v0.8 exit suite and only then advance to v0.9.
 
 ## Resume rule
 
