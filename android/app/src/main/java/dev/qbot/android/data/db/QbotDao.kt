@@ -26,6 +26,34 @@ interface QbotDao {
     @Query("SELECT COUNT(*) FROM inbound_events")
     suspend fun inboundCount(): Int
 
+    @Query(
+        """
+        SELECT * FROM inbound_events
+        WHERE conversation_id = :conversationId
+          AND event_type = 'MESSAGE_RECEIVED'
+          AND text IS NOT NULL
+        ORDER BY received_at DESC, event_id DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun recentMessageEvents(
+        conversationId: String,
+        limit: Int,
+    ): List<InboundEventEntity>
+
+    @Query(
+        """
+        SELECT * FROM inbound_events
+        WHERE event_type = 'MESSAGE_RECEIVED'
+          AND text IS NOT NULL
+        ORDER BY received_at DESC, event_id DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun recentMessageEventsForMaintenance(
+        limit: Int,
+    ): List<InboundEventEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAgentRun(run: AgentRunEntity)
 
@@ -230,4 +258,80 @@ interface QbotDao {
 
     @Query("SELECT * FROM contact_profiles WHERE contact_id = :contactId LIMIT 1")
     suspend fun contact(contactId: String): ContactProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMemoryIfAbsent(memory: MemoryEntity): Long
+
+    @Query("SELECT * FROM memories WHERE memory_id = :memoryId LIMIT 1")
+    suspend fun memory(memoryId: String): MemoryEntity?
+
+    @Query(
+        """
+        SELECT * FROM memories
+        WHERE state = :state
+          AND (:conversationId IS NULL OR conversation_id = :conversationId)
+          AND (:taskId IS NULL OR task_id = :taskId)
+        ORDER BY created_at, memory_id
+        """,
+    )
+    suspend fun memoriesByState(
+        state: String,
+        conversationId: String? = null,
+        taskId: String? = null,
+    ): List<MemoryEntity>
+
+    @Query(
+        """
+        SELECT * FROM memories
+        WHERE state = :state
+          AND memory_id IN (:memoryIds)
+        ORDER BY memory_id
+        """,
+    )
+    suspend fun memoriesByStateAndIds(
+        state: String,
+        memoryIds: List<String>,
+    ): List<MemoryEntity>
+
+    @Query(
+        """
+        UPDATE memories
+        SET state = :targetState
+        WHERE memory_id = :memoryId AND state = :expectedState
+        """,
+    )
+    suspend fun transitionMemory(
+        memoryId: String,
+        expectedState: String,
+        targetState: String,
+    ): Int
+
+    @Query("SELECT COUNT(*) FROM memories")
+    suspend fun memoryCount(): Int
+
+    @Query(
+        """
+        SELECT * FROM event_journal
+        WHERE related_id = :relatedId
+        ORDER BY occurred_at, journal_id
+        """,
+    )
+    suspend fun journalForRelated(relatedId: String): List<JournalEntity>
+
+    @Upsert
+    suspend fun upsertConversationSummary(
+        summary: ConversationSummaryEntity,
+    )
+
+    @Query(
+        """
+        SELECT * FROM conversation_summaries
+        WHERE conversation_id = :conversationId
+        LIMIT 1
+        """,
+    )
+    suspend fun conversationSummary(
+        conversationId: String,
+    ): ConversationSummaryEntity?
+
 }

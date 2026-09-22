@@ -11,6 +11,7 @@ from pathlib import Path
 from qbot.app import DesktopRuntime, build_runtime
 from qbot.config import QbotConfig
 from qbot.llm import LlmDecisionEngine, ModelRole
+from qbot.memory_maintenance import MemoryMaintenanceService
 from qbot.llm.env_config import build_router_from_environment
 from qbot.logging import configure_logging, log_event
 from qbot.persistence import Database
@@ -145,6 +146,12 @@ def _configure_assist(runtime: DesktopRuntime) -> None:
         context_source=context_source,
     )
     runtime.core.set_decision_engine(decision)
+    runtime.core.set_memory_maintenance(
+        MemoryMaintenanceService(
+            database=runtime.database,
+            router=router,
+        )
+    )
 
 
 async def _run(args: argparse.Namespace) -> int:

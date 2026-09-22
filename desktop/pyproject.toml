@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qbot-desktop"
-version = "0.3.0.dev0"
+version = "0.7.0"
 description = "Qbot desktop runtime"
 requires-python = ">=3.12"
 dependencies = [

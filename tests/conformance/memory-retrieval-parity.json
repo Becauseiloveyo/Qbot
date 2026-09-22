@@ -1,0 +1,716 @@
+{
+  "fixture_version": "0.1.0",
+  "name": "deterministic memory retrieval cross-runtime parity",
+  "given": {
+    "memories": [
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-alpha",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting moved to eight",
+        "entities": [
+          "tea",
+          "meeting"
+        ],
+        "importance": 0.6,
+        "trust": 0.8,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-alpha"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.100Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-beta",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting notes",
+        "entities": [
+          "tea"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-beta"
+        },
+        "valid_from": "2025-09-01T00:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2025-09-01T00:00:00Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-gamma",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "meeting room changed",
+        "entities": [
+          "meeting"
+        ],
+        "importance": 0.4,
+        "trust": 0.9,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-gamma"
+        },
+        "valid_from": "2026-09-18T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.200Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-candidate",
+        "state": "CANDIDATE",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting candidate",
+        "entities": [
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-candidate"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.300Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-rejected",
+        "state": "REJECTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting rejected",
+        "entities": [
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-rejected"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.400Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-superseded",
+        "state": "SUPERSEDED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting superseded",
+        "entities": [
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-superseded"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.500Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-other-domain",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-other",
+        "task_id": null,
+        "content": "tea meeting other conversation",
+        "entities": [
+          "tea",
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-other-domain"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.600Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-future",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting future",
+        "entities": [
+          "tea",
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-future"
+        },
+        "valid_from": "2026-09-21T10:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.700Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-expired",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting expired",
+        "entities": [
+          "tea",
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-expired"
+        },
+        "valid_from": "2026-09-19T10:00:00Z",
+        "valid_to": "2026-09-20T16:00:00Z",
+        "supersedes": null,
+        "created_at": "2026-09-19T10:00:00Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-low-trust",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "tea meeting low trust",
+        "entities": [
+          "tea",
+          "meeting"
+        ],
+        "importance": 1,
+        "trust": 0.2,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-low-trust"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.800Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-irrelevant",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-parity",
+        "task_id": null,
+        "content": "shopping preference",
+        "entities": [
+          "shopping"
+        ],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-irrelevant"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.900Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-unicode",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-unicode",
+        "task_id": null,
+        "content": "Straße ＭＥＥＴＩＮＧ",
+        "entities": [
+          "Straße"
+        ],
+        "importance": 0.7,
+        "trust": 0.9,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-unicode"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.300Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-unicode-secondary",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-unicode",
+        "task_id": null,
+        "content": "strasse notes",
+        "entities": [],
+        "importance": 1,
+        "trust": 1,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-unicode-secondary"
+        },
+        "valid_from": "2026-09-20T12:00:00Z",
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.400Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-tie-old",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-tie",
+        "task_id": null,
+        "content": "same",
+        "entities": [],
+        "importance": 0.5,
+        "trust": 0.5,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-tie-old"
+        },
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.100Z"
+      },
+      {
+        "schema_version": "0.1.0",
+        "memory_id": "mem-tie-new",
+        "state": "PROMOTED",
+        "scope": "CONVERSATION_MEMORY",
+        "owner_id": null,
+        "conversation_id": "conv-tie",
+        "task_id": null,
+        "content": "same",
+        "entities": [],
+        "importance": 0.5,
+        "trust": 0.5,
+        "confidence": 1,
+        "provenance": {
+          "source_type": "USER_SELF",
+          "source_message_id": null,
+          "source_event_id": "evt-tie-new"
+        },
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": null,
+        "created_at": "2026-09-20T16:00:00.900Z"
+      }
+    ],
+    "retrieval_cases": [
+      {
+        "case_id": "state-domain-time-score",
+        "evaluation_time": "2026-09-20T16:30:00Z",
+        "query": {
+          "scopes": [
+            "CONVERSATION_MEMORY"
+          ],
+          "text": "tea meeting",
+          "owner_id": null,
+          "conversation_id": "conv-parity",
+          "task_id": null,
+          "entities": [
+            "meeting"
+          ],
+          "min_trust": 0.4,
+          "limit": 3
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "score": {
+                "total_points": 93000,
+                "keyword_milli": 1000,
+                "entity_milli": 1000,
+                "recency_milli": 1000,
+                "importance_milli": 600,
+                "trust_milli": 800
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "score": {
+                "total_points": 70250,
+                "keyword_milli": 500,
+                "entity_milli": 1000,
+                "recency_milli": 850,
+                "importance_milli": 400,
+                "trust_milli": 900
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "score": {
+                "total_points": 66500,
+                "keyword_milli": 1000,
+                "entity_milli": 0,
+                "recency_milli": 100,
+                "importance_milli": 1000,
+                "trust_milli": 1000
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "unicode-normalization-casefold",
+        "evaluation_time": "2026-09-20T16:30:00Z",
+        "query": {
+          "scopes": [
+            "CONVERSATION_MEMORY"
+          ],
+          "text": "STRASSE meeting",
+          "owner_id": null,
+          "conversation_id": "conv-unicode",
+          "task_id": null,
+          "entities": [
+            "strasse"
+          ],
+          "min_trust": 0,
+          "limit": 10
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-unicode",
+              "score": {
+                "total_points": 95500,
+                "keyword_milli": 1000,
+                "entity_milli": 1000,
+                "recency_milli": 1000,
+                "importance_milli": 700,
+                "trust_milli": 900
+              }
+            },
+            {
+              "memory_id": "mem-unicode-secondary",
+              "score": {
+                "total_points": 60000,
+                "keyword_milli": 500,
+                "entity_milli": 0,
+                "recency_milli": 1000,
+                "importance_milli": 1000,
+                "trust_milli": 1000
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "subsecond-created-at-tiebreak",
+        "evaluation_time": "2026-09-20T16:30:00Z",
+        "query": {
+          "scopes": [
+            "CONVERSATION_MEMORY"
+          ],
+          "text": "same",
+          "owner_id": null,
+          "conversation_id": "conv-tie",
+          "task_id": null,
+          "entities": [],
+          "min_trust": 0,
+          "limit": 2
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-tie-new",
+              "score": {
+                "total_points": 67500,
+                "keyword_milli": 1000,
+                "entity_milli": 0,
+                "recency_milli": 1000,
+                "importance_milli": 500,
+                "trust_milli": 500
+              }
+            },
+            {
+              "memory_id": "mem-tie-old",
+              "score": {
+                "total_points": 67500,
+                "keyword_milli": 1000,
+                "entity_milli": 0,
+                "recency_milli": 1000,
+                "importance_milli": 500,
+                "trust_milli": 500
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "semantic_cases": [
+      {
+        "case_id": "disabled-preserves-deterministic-order",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": null,
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "DISABLED",
+                "provider": null,
+                "model": null,
+                "score_milli": null,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "DISABLED",
+                "provider": null,
+                "model": null,
+                "score_milli": null,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "DISABLED",
+                "provider": null,
+                "model": null,
+                "score_milli": null,
+                "error_type": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "unavailable-preserves-deterministic-order",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": {
+          "behavior": "unavailable",
+          "provider": "noop",
+          "model": null,
+          "outputs": []
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "UNAVAILABLE",
+                "provider": "noop",
+                "model": null,
+                "score_milli": null,
+                "error_type": "SemanticScorerUnavailable"
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "UNAVAILABLE",
+                "provider": "noop",
+                "model": null,
+                "score_milli": null,
+                "error_type": "SemanticScorerUnavailable"
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "UNAVAILABLE",
+                "provider": "noop",
+                "model": null,
+                "score_milli": null,
+                "error_type": "SemanticScorerUnavailable"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "partial-scores-are-advisory",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": {
+          "behavior": "scores",
+          "provider": "fixed-contract",
+          "model": "semantic-contract-v1",
+          "outputs": [
+            {
+              "memory_id": "mem-alpha",
+              "score_milli": 10
+            },
+            {
+              "memory_id": "mem-beta",
+              "score_milli": 1000
+            }
+          ]
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "SCORED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": 10,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "MISSING",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "SCORED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": 1000,
+                "error_type": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "unknown-id-fails-closed",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": {
+          "behavior": "scores",
+          "provider": "fixed-contract",
+          "model": "semantic-contract-v1",
+          "outputs": [
+            {
+              "memory_id": "mem-other-domain",
+              "score_milli": 1000
+            }
+          ]
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "FAILED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": "MemoryRetrievalError"
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "FAILED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": "MemoryRetrievalError"
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "FAILED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": "MemoryRetrievalError"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "expect": {
+    "cross_runtime_retrieval_parity": true,
+    "cross_runtime_semantic_advisory_parity": true
+  }
+}

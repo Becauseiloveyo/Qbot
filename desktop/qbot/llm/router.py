@@ -23,6 +23,9 @@ class ModelRouter:
     def add_fallback(self, role: ModelRole, provider: LlmProvider) -> None:
         self._providers.setdefault(role, []).append(provider)
 
+    def has_role(self, role: ModelRole) -> bool:
+        return bool(self._providers.get(role))
+
     def providers_for(self, role: ModelRole) -> tuple[LlmProvider, ...]:
         providers = self._providers.get(role)
         if not providers:

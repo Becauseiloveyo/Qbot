@@ -85,6 +85,8 @@ Deliverables:
 
 ## v0.7 — Hybrid Memory
 
+Status: **complete** on 2026-09-22.
+
 Deliverables:
 
 - candidate memory staging;
@@ -94,6 +96,8 @@ Deliverables:
 - semantic retrieval;
 - temporal/entity scoring;
 - background summarization and memory extraction.
+
+Exit condition: Desktop and Android independently preserve the same memory trust boundary, deterministic retrieval semantics, advisory semantic contract, candidate-only background extraction, and derived-summary precedence while passing cross-runtime conformance and persistence migration checks.
 
 ## v0.8 — PC/Phone Sync + Coordinator
 

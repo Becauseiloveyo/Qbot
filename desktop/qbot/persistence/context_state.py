@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from .database import Database
-from .tables import inbound_events, task_checkpoints, task_steps, tasks
+from .tables import (
+    conversation_summaries,
+    inbound_events,
+    task_checkpoints,
+    task_steps,
+    tasks,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,6 +20,7 @@ class DurableContextSnapshot:
     active_task: str | None
     checkpoint: str | None
     important_decisions: tuple[str, ...]
+    rolling_summary: str | None
     recent_messages: tuple[str, ...]
 
 
@@ -71,6 +78,12 @@ class ContextStateRepository:
                         self._json_string_list(checkpoint["decisions_json"])
                     )
 
+            summary_row = conn.execute(
+                select(conversation_summaries.c.summary).where(
+                    conversation_summaries.c.conversation_id == conversation_id
+                )
+            ).scalar_one_or_none()
+
             recent_rows = conn.execute(
                 select(
                     inbound_events.c.sender_id,
@@ -94,6 +107,7 @@ class ContextStateRepository:
             active_task=task_text,
             checkpoint=checkpoint_text,
             important_decisions=tuple(dict.fromkeys(decisions)),
+            rolling_summary=summary_row,
             recent_messages=recent,
         )
 

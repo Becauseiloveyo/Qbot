@@ -12,8 +12,8 @@ android {
         applicationId = "dev.qbot.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.6.0-dev"
+        versionCode = 7
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,6 +40,10 @@ android {
                 "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
                 "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
                 "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            )
+            it.systemProperty(
+                "qbot.repo.root",
+                rootProject.projectDir.parentFile.absolutePath,
             )
         }
     }

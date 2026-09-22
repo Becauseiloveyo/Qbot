@@ -1,13 +1,15 @@
 # Qbot Task Progress
 
-Last updated: 2026-09-20
+Last updated: 2026-09-22
 Architecture: Qbot Architecture v1.2 FINAL
-Current milestone: v0.6 — Android Enhanced Transports
-Current branch: `feature/android-v0.6-enhanced-transports`
+Current milestone: v0.7 — Hybrid Memory (COMPLETE)
+Current branch: `feature/v0.7-hybrid-memory`
+Next milestone: v0.8 — PC/Phone Sync + Coordinator
+Development cadence: one user-requested development cycle completes one roadmap minor version (0.1) before advancing; intermediate checkpoints do not end the cycle.
 
 ## Current objective
 
-Add Android enhanced transport capabilities behind the existing platform-neutral QQTransport boundary. Accessibility/Shizuku may improve observation or interaction only where their behavior can be identified, capability-reported, policy-gated, durably outboxed, and tested without weakening v0.5 recovery/idempotency guarantees.
+v0.7 Hybrid Memory is complete and validated. Preserve the v0.7 authority boundary while preparing the next 0.1 development unit: v0.8 coordinator/sync. Active Task/Checkpoint remains direct-loaded and outside normal memory retrieval.
 
 ## Completed
 
@@ -190,15 +192,76 @@ Add Android enhanced transport capabilities behind the existing platform-neutral
 - Real QQ/TIM Accessibility UI profiles/view IDs are intentionally not guessed. Live profile calibration/verification against an actual device/app version remains an environment validation item, analogous to live NapCat verification in v0.2.
 - v0.6 roadmap deliverables are complete.
 
+- Added Desktop durable Hybrid Memory persistence with schema v4, provenance/trust fields, deterministic candidate idempotency, Candidate -> Promoted/Rejected transitions, append/supersede history, and authoritative MEMORY_PROMOTED journaling.
+- Desktop memory policy prevents CONTACT provenance from staging SYSTEM_POLICY or USER_PERSONA state and enforces required scope identity/provenance.
+- Added Android Room MemoryEntity parity and bumped Android Room schema to v2 with explicit non-destructive v1->v2 migration.
+- Added Android MemoryRepository parity for candidate staging, promotion/rejection, supersede-domain validation, idempotent provenance-derived candidates, and journaled authoritative promotion.
+- Added Android Room tests for trust boundaries, provenance requirements, idempotency, append/supersede history, rejected-state protection, and migration registry coverage.
+- v0.7 persistence/staging checkpoint passed: Android Tests #224, Desktop Tests #491, and Conformance #517 all succeeded on commit `cfa29a9`.
+- Added Desktop deterministic `MemoryRetriever` over authoritative PROMOTED memory with explicit scope/domain requirements and temporal validity filtering.
+- Frozen cross-runtime-friendly integer scoring contract: keyword 40%, entity 20%, recency 15%, importance 10%, trust 15%; score components use 0-1000 integer units and deterministic tie-breaking.
+- Retrieval excludes CANDIDATE/REJECTED/SUPERSEDED records, wrong owner/conversation/task domains, future/not-yet-valid memory, expired memory, and lexical/entity-irrelevant records when the query supplies relevance signals.
+- Added deterministic Desktop retrieval tests for state/domain isolation, stable ranking, component scoring, temporal validity, explicit domain requirements, relevance fail-closed behavior, and repeatable limits.
+- ADR-021 records that FTS5/semantic backends may accelerate candidate discovery but cannot change eligibility, trust/domain boundaries, ranking semantics, or Active Task/Checkpoint force-loading.
+- Desktop Tests #495 and Conformance #521 passed on deterministic retrieval commit `6aea7f2`; Android Tests #226 later completed successfully.
+- Added Android deterministic `MemoryRetriever` parity with PROMOTED-only eligibility, explicit owner/conversation/task domain isolation, temporal validity, relevance fail-closed behavior, min-trust filtering, and the ADR-021 integer scoring weights/tie-break order.
+- Android normalization mirrors Desktop NFKC + Unicode case-fold semantics using ICU `UCharacter.foldCase`; recency and created-at ordering preserve sub-second precision rather than reducing timestamps to epoch seconds.
+- Added Android Room retrieval regression tests covering authoritative-state/domain isolation, deterministic component scores, temporal validity, relevance filtering, explicit domain requirements, min-trust filtering, stable ordering, and limits.
+- Android deterministic retrieval required no Room schema change; schema remains v2 and FTS/index persistence is still deferred until cross-runtime parity fixtures pass.
+- Latest retrieval parity checkpoint passed on `de842dc`: Android Tests #231, Desktop Tests #501, and Conformance #527 all succeeded.
+- Added shared `tests/conformance/memory-retrieval-parity.json` as the cross-runtime deterministic retrieval oracle. It contains explicit persisted memory rows, fixed evaluation times, query/domain parameters, expected ordered IDs, and expected integer score components.
+- Shared retrieval coverage includes PROMOTED-only state filtering, wrong-domain exclusion, future/expired filtering, min-trust filtering, relevance fail-closed behavior, weighted score ordering, Unicode NFKC + case-fold parity, and sub-second created-at tie-breaking.
+- `tools/validate_conformance.py` now independently re-evaluates ADR-021 retrieval semantics and rejects fixture expectations that do not match the frozen deterministic contract.
+- Desktop and Android retrieval tests consume the exact same shared JSON fixture rather than duplicated platform fixtures. Android Gradle receives the repository root explicitly for unit tests, and Android CI now reruns when the shared retrieval fixture changes.
+- Cross-runtime deterministic retrieval parity passed on commit `5ec0aea`: Android Tests #234, Desktop Tests #505, and Conformance #531 all succeeded; Android Room schema remains v2.
+- Added optional Desktop SQLite FTS5/trigram candidate acceleration as a disposable derived index; authoritative `memories` and ADR-021 scoring remain unchanged.
+- FTS indexes NFKC + Unicode case-fold normalized content/entities, is used only for simple normalized ASCII alphanumeric relevance signals of length >=3, and falls back to deterministic scan for short/non-ASCII/structured/empty/unsupported queries or any FTS error.
+- FTS candidate IDs are always rechecked through PROMOTED/state, scope/domain, trust, temporal validity, exact relevance components, ADR-021 integer scoring, and stable tie-break rules before returning results.
+- The derived index lazily rebuilds when append-only Memory row count diverges from index row count; it is not part of the authoritative Desktop schema version, so lack of FTS5/trigram support cannot trigger Safe Mode.
+- ADR-022 records the disposable/fallback FTS boundary.
+- Desktop tests now explicitly prove indexed == scan on the shared parity fixture, Unicode-normalized queries, explicit scan mode, short/non-ASCII fallback, and index rebuild after Memory growth. Desktop #509 ran 92 tests successfully.
+- Desktop FTS acceleration checkpoint passed on `09f4090`: Android Tests #236, Desktop Tests #509, and Conformance #535 all succeeded.
+- Added Android Room-backed disposable FTS4 candidate acceleration without adding an authoritative Room Entity or schema migration; Room schema remains v2.
+- Android FTS stores overlapping ASCII 3-grams derived from the same NFKC + Unicode case-fold normalized content/entities used by ADR-021. It is attempted only for simple normalized ASCII alphanumeric relevance signals of length >=3.
+- Android FTS executes one MATCH per relevance signal and unions candidate IDs in Kotlin, avoiding SQLite FTS4 multi-signal OR parser differences; each signal uses implicit-AND 3-gram matching to produce a safe substring candidate superset.
+- Short/non-ASCII/structured/empty/unsupported queries and FTS failures fall back to deterministic scan. Candidate IDs are then reloaded from authoritative `memories` and all ADR-021 state/domain/trust/temporal/relevance/scoring/tie-break rules are reapplied.
+- The Android derived FTS index lazily rebuilds on append-only Memory row-count divergence and remains outside Room schema export/versioning. ADR-023 records this boundary.
+- Android retrieval tests now prove indexed == scan against the shared cross-runtime fixture, explicit scan mode, short/non-ASCII fallback, and index rebuild after Memory growth.
+- Initial Android FTS query-composition attempts exposed FTS4 parser differences; final per-signal union implementation passed on `5beb91f`.
+- Android FTS checkpoint passed: Android Tests #243, Desktop Tests #517, and Conformance #543 all succeeded; Android Room schema verification/upload also passed.
+- Added provider-neutral asynchronous `SemanticRelevanceScorer` contract on Desktop with integer `score_milli` (0-1000), explicit candidate/request records, and runtime provider/model provenance.
+- Added explicit `retrieve_with_semantics()` opt-in path. Semantic scoring runs only after ADR-021 deterministic retrieval has fixed eligibility, IDs, ordering, limit, and deterministic score components.
+- Semantic scores are advisory metadata only in v0.7: they do not add/remove/reorder Memory, do not contribute to deterministic `total_points`, do not persist, and do not mutate authoritative state.
+- No scorer configured returns the same deterministic hits marked DISABLED; the deterministic `NoopSemanticRelevanceScorer` returns the same hits marked UNAVAILABLE.
+- Semantic provider failures and invalid output (unknown/ineligible IDs, duplicate IDs, non-integer or out-of-range scores) fail closed to semantic metadata marked FAILED while preserving deterministic IDs/order/scores.
+- Added Desktop semantic tests proving reverse/high semantic scores cannot reorder deterministic hits, missing/unavailable/failing backends are no-op for correctness, and semantic scorers never receive CANDIDATE or wrong-domain Memory.
+- Added a direct-state regression proving semantic scoring cannot replace or mutate Active Task/Checkpoint restoration through `DurableSqliteContextSource`.
+- ADR-024 records the advisory semantic authority boundary; no database or persistence schema change was required.
+- Semantic contract checkpoint passed on `a171656`: Desktop Tests #521 ran 98/98 successfully, Android Tests #245 passed with Room schema verify/upload, and Conformance #547 passed.
+- Mirrored ADR-024 on Android with provider-neutral async semantic candidate/request/score/audit types, `SemanticRelevanceScorer`, deterministic `NoopSemanticRelevanceScorer`, and explicit `retrieveWithSemantics()`.
+- Android semantic scoring runs only after deterministic ADR-021 retrieval and preserves deterministic Memory IDs, ordering, limits, and score components. Semantic metadata is nullable on ordinary `MemoryHit` and is attached only through the explicit semantic path.
+- Android validates semantic output against the already-eligible hit set; unknown/ineligible IDs, duplicate IDs, and scores outside 0-1000 fail closed to FAILED audit metadata without changing deterministic results.
+- Extended the shared `memory-retrieval-parity.json` fixture with model-independent semantic cases for DISABLED, UNAVAILABLE, partial SCORED/MISSING output, and malicious unknown-ID failure while preserving deterministic hit order.
+- `tools/validate_conformance.py` now independently derives the semantic audit result from the deterministic retrieval case and scorer behavior, so the fixture cannot redefine the authority boundary.
+- Desktop and Android both consume the same semantic contract cases; Desktop shared semantic fixture regression passed as part of 99/99 Desktop tests.
+- Cross-runtime semantic advisory checkpoint passed on `910f779`: Android Tests #248, Desktop Tests #525, and Conformance #551 all succeeded; Android Room schema verify/upload also passed and no persistence schema changed.
+- Added Desktop provider-neutral background Memory maintenance using MEMORY/SUMMARY roles. External message proposals are validated as a full batch, forced to CONTACT provenance/domain IDs/trust, and staged only through `MemoryRepository.create_candidate()`; background code has no promotion authority.
+- Added durable Desktop `conversation_summaries` in schema v5 with explicit v4->v5 migration, bounded-window SHA-256 idempotency, provider/model provenance, restart catch-up, and derived-context rendering below System Policy/Persona/Active Task/Checkpoint.
+- Desktop background maintenance passed restart/idempotency, malicious-scope, invalid-model, migration, and context-precedence tests; Desktop Tests #529 ran 103/103 successfully and Conformance #555 passed on `18a2e44`.
+- Mirrored background maintenance on Android with Room schema v3, explicit v2->v3 migration, provider-neutral extractor/summarizer interfaces, CONTACT provenance binding, candidate-only staging, derived summary persistence, per-event WorkManager unique work, and startup catch-up.
+- Android installs no fake maintenance model backend: WorkManager scheduling is a no-op until a real runtime provider factory is configured; queued work retries provider-unavailable process restarts without gaining authority.
+- Android tests cover candidate-only staging, provenance/trust binding, derived summary persistence, provider failure/no-provider no-op, malicious trusted-scope rejection, repeat/restart idempotency, explicit migration registry, and schedule-on-new-admission only.
+- Android background maintenance checkpoint passed on `ade680a`: Android Tests #252, Desktop Tests #531, and Conformance #557 all succeeded; Room schema v3 verify/upload passed.
+- v0.7 Hybrid Memory deliverables are complete across Desktop and Android: durable staging/provenance, append/supersede, deterministic + FTS retrieval, advisory semantic scoring, background candidate extraction, and rolling summarization, while Active Task/Checkpoint remains direct-loaded.
+
 ## In progress
 
-- Create the v0.7 Hybrid Memory branch from the verified v0.6 head and begin candidate-memory staging/provenance persistence.
+- None for v0.7. The milestone is closed; do not start v0.8 feature work on this branch as part of the v0.7 development unit.
 
 ## Not started
 
 - Device-specific verified QQ/TIM Accessibility profile calibration.
 - Persona/contact UI.
-- Memory retrieval implementation.
 - Coordinator and phone/PC synchronization.
 - Full management UI.
 
@@ -227,13 +290,12 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Confirm the latest Android exact-token CI result and close any reported v0.6 regression.
-2. Mark v0.6 roadmap deliverables complete once the latest Android, Desktop, and Conformance checks are green.
-3. Create `feature/v0.7-hybrid-memory` from the verified v0.6 head.
-4. Implement candidate-memory staging and provenance/trust persistence first; external/contact text must not directly become trusted persona/system memory.
-5. Add append/supersede memory history and deterministic FTS/entity/temporal/importance retrieval before semantic embeddings.
-6. Add semantic retrieval as a pluggable scorer and keep active Task/Checkpoint outside normal memory retrieval.
-7. Add background memory extraction/summarization only after synchronous durable reply/task state remains independent from indexing.
+1. Start the next 0.1 development unit by branching `feature/v0.8-coordinator-sync` from the validated v0.7 head; do not continue feature development on the v0.7 branch.
+2. Freeze the v0.8 coordinator protocol and common contracts first: node identity, writer lease, fencing epoch, optimistic version, sync envelope, conflict/rejection reason, and manual failover state.
+3. Implement Desktop coordinator/single-writer enforcement and durable lease/fencing recovery, then mirror the stable protocol on Android.
+4. Add task/memory/checkpoint sync with explicit ownership/version checks; stale epochs and stale record versions must fail closed rather than last-write-win.
+5. Add manual failover before any automatic failover, with split-brain/concurrency tests and cross-runtime fixtures.
+6. Run the full v0.8 exit suite and only then advance to v0.9.
 
 ## Resume rule
 

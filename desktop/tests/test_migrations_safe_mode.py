@@ -29,6 +29,8 @@ class MigrationAndSafeModeTests(unittest.TestCase):
                 # Remove tables introduced by the explicit v1->v2 and v2->v3
                 # migrations while preserving the v1 durable core tables.
                 for table in (
+                    "conversation_summaries",
+                    "memories",
                     "contact_profiles",
                     "personas",
                     "task_checkpoints",
@@ -45,7 +47,7 @@ class MigrationAndSafeModeTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_v1_database_is_backed_up_then_migrated_to_v3(self) -> None:
+    def test_v1_database_is_backed_up_then_migrated_to_v5(self) -> None:
         self._seed_v1_like_database()
 
         db = Database(self.config)
@@ -54,10 +56,10 @@ class MigrationAndSafeModeTests(unittest.TestCase):
             self.assertFalse(report.safe_mode)
             self.assertTrue(report.integrity_ok)
             self.assertEqual(report.migrated_from, "1")
-            self.assertEqual(report.migrated_to, "3")
+            self.assertEqual(report.migrated_to, "5")
             self.assertIsNotNone(report.backup_path)
             self.assertTrue(report.backup_path.exists())
-            self.assertEqual(db.meta("db_schema_version"), "3")
+            self.assertEqual(db.meta("db_schema_version"), "5")
             self.assertIsNotNone(db.meta("last_integrity_check_at"))
 
             with db.engine.connect() as conn:
@@ -74,6 +76,8 @@ class MigrationAndSafeModeTests(unittest.TestCase):
             self.assertIn("task_checkpoints", tables)
             self.assertIn("personas", tables)
             self.assertIn("contact_profiles", tables)
+            self.assertIn("memories", tables)
+            self.assertIn("conversation_summaries", tables)
 
             old = sqlite3.connect(report.backup_path)
             try:

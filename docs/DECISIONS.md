@@ -130,3 +130,53 @@ Decision: for a routed Outbox effect, the selected stable adapter ID is committe
 Accessibility enhanced sends additionally require a process-local exact conversation binding and a positively verified UI profile. The active conversation token and unambiguous composer/send controls are checked on each UI action; permission or service connectivity alone never implies `SEND_TEXT`.
 
 Reason: multi-adapter fallback is safe only before an external attempt. Persisting the routing identity closes the crash window between adapter selection and result recording, while exact per-action Accessibility validation reduces misrouting risk when the QQ/TIM UI changes concurrently.
+
+## ADR-021 — Deterministic memory retrieval precedes FTS and semantic acceleration
+
+Decision: Qbot v0.7 freezes memory eligibility and ranking independently from any retrieval index. Normal retrieval reads only `PROMOTED` memories, requires explicit scope/domain identifiers, excludes records outside their validity window, and filters out lexical/entity-irrelevant records when the query supplies relevance signals. The deterministic score uses integer components on a 0-1000 scale: keyword 40%, entity 20%, recency 15%, importance 10%, and trust 15%. Ties are resolved by component scores, then newer creation time, then `memory_id`.
+
+SQLite FTS5 and later semantic/embedding scorers are candidate accelerators or additional pluggable relevance signals only. They may not make CANDIDATE/REJECTED/SUPERSEDED memories eligible, bypass trust/domain boundaries, or change Active Task/Checkpoint force-loading.
+
+Reason: Android and Desktop must be able to reproduce the same memory selection before backend-specific indexing is introduced. Integer scoring and explicit domain filters reduce cross-runtime drift, while separating eligibility from acceleration prevents an FTS/vector index from becoming an accidental authority boundary.
+
+## ADR-022 — Desktop FTS5 is a disposable candidate accelerator
+
+Decision: Desktop v0.7 may maintain a derived SQLite FTS5 `memory_search_fts` virtual table containing NFKC + case-fold normalized Memory content/entities. The index is not part of the authoritative schema version and may be deleted/rebuilt at any time. FTS is used only when all relevance signals are simple normalized ASCII alphanumeric strings of at least three characters, allowing the trigram tokenizer to provide a candidate superset for ADR-021 substring/entity relevance. Short, non-ASCII, structured, empty, unsupported, or FTS-error queries fall back to the deterministic scan path.
+
+The authoritative `memories` table remains the source of truth. After FTS candidate IDs are selected, Qbot reapplies all PROMOTED/state, scope/domain, trust, temporal, relevance, integer scoring, and tie-break rules from ADR-021. The derived index is lazily rebuilt when append-only Memory row count diverges from the index row count. Failure to create/query FTS5 disables acceleration for that retriever instance and must not put the database into Safe Mode.
+
+Reason: FTS should improve candidate discovery cost without creating a new authority boundary or making runtime correctness depend on a particular SQLite build. Keeping it derived and fail-open-to-scan preserves cross-runtime semantics and allows backups/migrations to remain valid even when FTS5/trigram support is absent.
+
+## ADR-023 — Android FTS is a Room-backed disposable 3-gram index
+
+Decision: Android v0.7 mirrors the Desktop FTS accelerator boundary inside the Room-managed SQLite file without adding an authoritative Room Entity or schema migration. `MemoryRetriever` may lazily create a disposable FTS4 virtual table named `memory_search_fts`. Its indexed document is a set of overlapping ASCII 3-grams derived from the same NFKC + Unicode case-fold normalized Memory content/entities used by ADR-021.
+
+Acceleration is attempted only when every normalized relevance signal is ASCII alphanumeric and at least three characters long. Each signal is translated to an AND group of its 3-grams, while multiple signals are ORed to obtain a candidate superset. Short, non-ASCII, structured, empty, unsupported, or FTS-error queries use the deterministic scan path. Candidate IDs are then reloaded from the authoritative `memories` table and all ADR-021 state/domain/trust/temporal/relevance/scoring/tie-break rules are reapplied unchanged.
+
+The virtual table is derived state: it may be deleted or rebuilt, is excluded from Room schema versioning/export, and row-count divergence after append-only Memory growth triggers lazy rebuild. Failure to create or query FTS4 disables acceleration for that retriever instance without changing authoritative state.
+
+Reason: Android's broadly available FTS4 tokenizer does not provide the same native trigram tokenizer as Desktop SQLite FTS5. Explicit normalized 3-gram documents preserve substring candidate semantics while keeping the index non-authoritative, cross-runtime results deterministic, and Room schema v2 unchanged.
+
+## ADR-024 — Semantic memory scoring is advisory and cannot change deterministic retrieval
+
+Decision: v0.7 introduces a provider-neutral asynchronous `SemanticRelevanceScorer` contract only after ADR-021 deterministic eligibility and ordering have completed. The scorer receives only the already-selected deterministic Memory hits and may return an integer `score_milli` (0-1000) plus runtime provider/model provenance. Semantic scores are audit metadata in this milestone: they do not add, remove, reorder, promote, persist, or otherwise mutate Memory, and they do not contribute to the frozen ADR-021 `total_points`.
+
+The semantic path is explicit opt-in through `retrieve_with_semantics()`. With no scorer configured it returns the same deterministic hits marked DISABLED. An intentionally unavailable backend returns the same hits marked UNAVAILABLE. Provider exceptions, duplicate IDs, unknown/ineligible IDs, non-integer scores, and scores outside 0-1000 fail closed to semantic metadata marked FAILED; deterministic IDs, ordering, and scores are preserved. Active Task/Checkpoint restoration remains a separate direct durable-state path and is never supplied to the semantic scorer.
+
+Reason: embedding providers are optional, failure-prone, and may differ across platforms/models. Freezing a non-authoritative scorer contract first provides semantic observability without weakening trust/domain boundaries or making core correctness depend on embeddings. Any future semantic reranking or score fusion requires a separate explicit decision and cross-runtime contract rather than silently changing ADR-021 ranking semantics.
+
+## ADR-025 — Background memory maintenance produces candidates and derived summaries only
+
+Decision: v0.7 background memory maintenance is best-effort and non-authoritative. For each durably admitted external MESSAGE_RECEIVED event, the MEMORY model may propose only CONTACT_PROFILE, CONVERSATION_MEMORY, or TASK_MEMORY candidates. Qbot binds source_type=CONTACT, source_event_id/source_message_id, conversation/contact/task identity, and a conservative trust score from durable event state; the model cannot supply or override those fields. Parsed proposals are staged through MemoryRepository.create_candidate() and are never promoted by the maintenance path.
+
+Successful extraction is journaled as MEMORY_EXTRACTION_COMPLETED so replay/restart is idempotent even when the model returns zero candidates. Failed or invalid model output creates no completion marker and no partial candidate set, so it may be retried later. The maintenance path never writes SYSTEM_POLICY, USER_PERSONA, Active Task, or Checkpoint.
+
+Rolling conversation summaries are persisted separately in conversation_summaries as replaceable derived context keyed by conversation_id. A SHA-256 digest of the bounded durable message window prevents redundant regeneration across retries and restarts. The summary is optional context rendered as DERIVED_ROLLING_SUMMARY and is explicitly subordinate to System Policy, Persona, Active Task, and Checkpoint. Summary/model failures are no-ops for authoritative state.
+
+Desktop DB schema v5 adds only conversation_summaries. It contains summary text, source digest/window metadata, provider/model provenance, and update time; it has no foreign-key path capable of mutating Task/Checkpoint/Persona/Memory authority.
+
+Android mirrors the same boundary in Room schema v3 with a `conversation_summaries` Entity and provider-neutral `MemoryCandidateExtractor` / `RollingSummarizer` contracts. The maintenance engine validates an entire proposal batch before staging candidates, forces CONTACT provenance and durable event/domain identifiers, and never exposes promotion authority. WorkManager uses unique per-event work plus startup catch-up, but scheduling is a no-op until a real runtime provider factory is configured; Qbot does not install a fake default model backend.
+
+Both runtimes compute the rolling-summary source digest from the same stable ordered message-window material: records separated by U+001E and `event_id / sender_id / text / received_at` fields separated by U+001F, then SHA-256. The digest is derived idempotency metadata, not trusted state.
+
+Reason: background LLM work is useful for long-context compression and candidate discovery, but it is exactly the wrong place to grant implicit authority. Durable provenance binding, candidate-only staging, digest idempotency, and a separate derived-summary store keep model failure or prompt injection from becoming trusted state.
