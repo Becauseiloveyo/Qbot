@@ -236,18 +236,24 @@ Build Hybrid Memory as durable, provenance-aware state before retrieval complexi
 - Added a direct-state regression proving semantic scoring cannot replace or mutate Active Task/Checkpoint restoration through `DurableSqliteContextSource`.
 - ADR-024 records the advisory semantic authority boundary; no database or persistence schema change was required.
 - Semantic contract checkpoint passed on `a171656`: Desktop Tests #521 ran 98/98 successfully, Android Tests #245 passed with Room schema verify/upload, and Conformance #547 passed.
+- Mirrored ADR-024 on Android with provider-neutral async semantic candidate/request/score/audit types, `SemanticRelevanceScorer`, deterministic `NoopSemanticRelevanceScorer`, and explicit `retrieveWithSemantics()`.
+- Android semantic scoring runs only after deterministic ADR-021 retrieval and preserves deterministic Memory IDs, ordering, limits, and score components. Semantic metadata is nullable on ordinary `MemoryHit` and is attached only through the explicit semantic path.
+- Android validates semantic output against the already-eligible hit set; unknown/ineligible IDs, duplicate IDs, and scores outside 0-1000 fail closed to FAILED audit metadata without changing deterministic results.
+- Extended the shared `memory-retrieval-parity.json` fixture with model-independent semantic cases for DISABLED, UNAVAILABLE, partial SCORED/MISSING output, and malicious unknown-ID failure while preserving deterministic hit order.
+- `tools/validate_conformance.py` now independently derives the semantic audit result from the deterministic retrieval case and scorer behavior, so the fixture cannot redefine the authority boundary.
+- Desktop and Android both consume the same semantic contract cases; Desktop shared semantic fixture regression passed as part of 99/99 Desktop tests.
+- Cross-runtime semantic advisory checkpoint passed on `910f779`: Android Tests #248, Desktop Tests #525, and Conformance #551 all succeeded; Android Room schema verify/upload also passed and no persistence schema changed.
 
 ## In progress
 
-- Mirror the frozen advisory semantic scorer contract on Android without adding embedding persistence or changing Room schema.
-- Add cross-runtime semantic contract fixtures/tests for status, score provenance, invalid-output fallback, and preservation of deterministic IDs/order where practical.
+- Add background candidate extraction and rolling summarization only after durable staging/promotion and deterministic/FTS/semantic retrieval now work independently.
+- Freeze extraction/summarization authority boundaries so model-generated output can only stage CANDIDATE memory and cannot directly promote trusted memory or mutate Active Task/Checkpoint.
 - Keep Active Task/Checkpoint direct-loaded and outside normal memory retrieval.
 
 ## Not started
 
 - Device-specific verified QQ/TIM Accessibility profile calibration.
 - Persona/contact UI.
-- Semantic retrieval as a pluggable scorer after deterministic retrieval is stable.
 - Background candidate extraction/summarization.
 - Coordinator and phone/PC synchronization.
 - Full management UI.
@@ -277,10 +283,10 @@ v0.1 is complete when:
 
 ## Next concrete actions
 
-1. Mirror ADR-024 on Android with provider-neutral async semantic request/candidate/score/audit types and an explicit semantic retrieval path that preserves deterministic IDs/order/scores.
-2. Add Android tests for DISABLED/UNAVAILABLE/FAILED/SCORED semantics, malicious/invalid scorer output, and proof that only ADR-021-eligible Memory is exposed to the semantic scorer.
-3. Add a shared semantic contract fixture or equivalent conformance checks so Desktop and Android agree on score/status validation and fallback semantics without requiring identical embedding models.
-4. Add background candidate extraction/summarization only after durable staging/promotion and all retrieval layers work independently.
+1. Define a provider-neutral background Memory extraction/summarization contract: input is bounded recent conversation/context, output is candidate proposals only, with explicit provenance/source IDs and no authoritative promotion side effect.
+2. Implement Desktop background candidate extraction first using the existing MEMORY/SUMMARY model roles and `MemoryRepository.create_candidate()`; invalid/model-failed output must be a no-op and contact-originated content must retain untrusted provenance.
+3. Add rolling-summary generation as optional context state that cannot overwrite Active Task/Checkpoint or trusted Persona/System Policy, then add tests for restart/idempotency and poisoning boundaries.
+4. Mirror the stable extraction/summarization contract on Android with lifecycle-safe background execution only after Desktop behavior is frozen.
 5. Keep active Task/Checkpoint force-loaded outside memory retrieval.
 6. Run v0.7 cross-runtime exit tests and update memory/security documentation.
 7. Only after v0.7 exits cleanly, advance to v0.8 coordinator/sync work.
