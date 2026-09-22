@@ -23,6 +23,23 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
+
+private class FixtureSemanticScorer(
+    override val providerName: String,
+    override val modelName: String?,
+    private val outputs: List<SemanticScore>,
+) : SemanticRelevanceScorer {
+    var seenCandidateIds: List<String> = emptyList()
+        private set
+
+    override suspend fun score(
+        request: SemanticScoringRequest,
+    ): List<SemanticScore> {
+        seenCandidateIds = request.candidates.map { it.memoryId }
+        return outputs
+    }
+}
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [37], application = Application::class)
 class MemoryRetrievalRoomTest {
@@ -445,6 +462,146 @@ class MemoryRetrievalRoomTest {
                 assertEquals(expectedScore.getInt("trust_milli"), hit.score.trustMilli)
             }
         }
+
+        val retrievalById = buildMap<String, JSONObject> {
+            for (caseIndex in 0 until cases.length()) {
+                val fixtureCase = cases.getJSONObject(caseIndex)
+                put(
+                    fixtureCase.getString("case_id"),
+                    fixtureCase,
+                )
+            }
+        }
+        val semanticCases = given.getJSONArray("semantic_cases")
+        for (caseIndex in 0 until semanticCases.length()) {
+            val semanticCase = semanticCases.getJSONObject(caseIndex)
+            val retrievalCase = retrievalById.getValue(
+                semanticCase.getString("retrieval_case_id"),
+            )
+            val rawQuery = retrievalCase.getJSONObject("query")
+            val query = MemoryQuery(
+                scopes = stringList(rawQuery.getJSONArray("scopes")),
+                text = rawQuery.optString("text", ""),
+                ownerId = nullableString(rawQuery, "owner_id"),
+                conversationId = nullableString(
+                    rawQuery,
+                    "conversation_id",
+                ),
+                taskId = nullableString(rawQuery, "task_id"),
+                entities = stringList(rawQuery.getJSONArray("entities")),
+                minTrust = rawQuery.getDouble("min_trust"),
+                limit = rawQuery.getInt("limit"),
+            )
+            val evaluationTime = Instant.parse(
+                retrievalCase.getString("evaluation_time"),
+            )
+            val deterministic = retriever.retrieve(
+                query = query,
+                now = evaluationTime,
+            )
+
+            val rawScorer =
+                if (semanticCase.isNull("scorer")) {
+                    null
+                } else {
+                    semanticCase.getJSONObject("scorer")
+                }
+            val scorer: SemanticRelevanceScorer? =
+                when {
+                    rawScorer == null -> null
+                    rawScorer.getString("behavior") == "unavailable" ->
+                        NoopSemanticRelevanceScorer()
+                    else -> {
+                        val outputsJson =
+                            rawScorer.getJSONArray("outputs")
+                        val outputs = buildList {
+                            for (
+                                outputIndex in 0 until outputsJson.length()
+                            ) {
+                                val output =
+                                    outputsJson.getJSONObject(outputIndex)
+                                add(
+                                    SemanticScore(
+                                        memoryId = output.getString(
+                                            "memory_id",
+                                        ),
+                                        scoreMilli = output.getInt(
+                                            "score_milli",
+                                        ),
+                                    ),
+                                )
+                            }
+                        }
+                        FixtureSemanticScorer(
+                            providerName = rawScorer.getString("provider"),
+                            modelName = nullableString(
+                                rawScorer,
+                                "model",
+                            ),
+                            outputs = outputs,
+                        )
+                    }
+                }
+
+            val enriched = retriever.retrieveWithSemantics(
+                query = query,
+                scorer = scorer,
+                now = evaluationTime,
+            )
+            val expected = semanticCase
+                .getJSONObject("expect")
+                .getJSONArray("hits")
+
+            assertEquals(
+                deterministic.map { it.record.memoryId },
+                enriched.map { it.record.memoryId },
+            )
+            assertEquals(
+                deterministic.map { it.score },
+                enriched.map { it.score },
+            )
+            assertEquals(expected.length(), enriched.size)
+
+            if (scorer is FixtureSemanticScorer) {
+                assertEquals(
+                    deterministic.map { it.record.memoryId },
+                    scorer.seenCandidateIds,
+                )
+            }
+
+            for (hitIndex in 0 until expected.length()) {
+                val expectedHit = expected.getJSONObject(hitIndex)
+                val expectedAudit =
+                    expectedHit.getJSONObject("semantic")
+                val hit = enriched[hitIndex]
+                val audit = checkNotNull(hit.semantic)
+
+                assertEquals(
+                    expectedHit.getString("memory_id"),
+                    hit.record.memoryId,
+                )
+                assertEquals(
+                    expectedAudit.getString("status"),
+                    audit.status.name,
+                )
+                assertEquals(
+                    nullableString(expectedAudit, "provider"),
+                    audit.provider,
+                )
+                assertEquals(
+                    nullableString(expectedAudit, "model"),
+                    audit.model,
+                )
+                assertEquals(
+                    nullableInt(expectedAudit, "score_milli"),
+                    audit.scoreMilli,
+                )
+                assertEquals(
+                    nullableString(expectedAudit, "error_type"),
+                    audit.errorType,
+                )
+            }
+        }
     }
 
     @Test
@@ -549,6 +706,9 @@ class MemoryRetrievalRoomTest {
 
     private fun nullableString(value: JSONObject, key: String): String? =
         if (!value.has(key) || value.isNull(key)) null else value.getString(key)
+
+    private fun nullableInt(value: JSONObject, key: String): Int? =
+        if (!value.has(key) || value.isNull(key)) null else value.getInt(key)
 
     private fun nullableDouble(value: JSONObject, key: String): Double? =
         if (!value.has(key) || value.isNull(key)) null else value.getDouble(key)

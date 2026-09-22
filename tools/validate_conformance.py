@@ -572,6 +572,198 @@ def assert_retrieval_invariants(
                 f"expected={expected!r}\nactual={actual!r}"
             )
 
+
+_SEMANTIC_STATUSES = {
+    "DISABLED",
+    "SCORED",
+    "MISSING",
+    "UNAVAILABLE",
+    "FAILED",
+}
+
+
+def _semantic_expected_hits(
+    *,
+    deterministic_ids: list[str],
+    scorer: dict[str, Any] | None,
+    path: Path,
+    case_id: str,
+) -> list[dict[str, Any]]:
+    if scorer is None:
+        return [
+            {
+                "memory_id": memory_id,
+                "semantic": {
+                    "status": "DISABLED",
+                    "provider": None,
+                    "model": None,
+                    "score_milli": None,
+                    "error_type": None,
+                },
+            }
+            for memory_id in deterministic_ids
+        ]
+
+    behavior = scorer.get("behavior")
+    provider = scorer.get("provider")
+    model = scorer.get("model")
+    if not isinstance(provider, str) or not provider.strip():
+        raise ValidationFailure(
+            f"{path}:{case_id}: semantic scorer provider must be non-empty"
+        )
+    provider = provider.strip()
+
+    if behavior == "unavailable":
+        return [
+            {
+                "memory_id": memory_id,
+                "semantic": {
+                    "status": "UNAVAILABLE",
+                    "provider": provider,
+                    "model": model,
+                    "score_milli": None,
+                    "error_type": "SemanticScorerUnavailable",
+                },
+            }
+            for memory_id in deterministic_ids
+        ]
+
+    if behavior != "scores":
+        raise ValidationFailure(
+            f"{path}:{case_id}: unsupported semantic scorer behavior {behavior!r}"
+        )
+
+    outputs = scorer.get("outputs", [])
+    if not isinstance(outputs, list):
+        raise ValidationFailure(
+            f"{path}:{case_id}: semantic scorer outputs must be an array"
+        )
+
+    score_by_id: dict[str, int] = {}
+    validation_error = False
+    for output in outputs:
+        if not isinstance(output, dict):
+            validation_error = True
+            break
+        memory_id = output.get("memory_id")
+        score = output.get("score_milli")
+        if (
+            not isinstance(memory_id, str)
+            or memory_id not in deterministic_ids
+            or memory_id in score_by_id
+            or isinstance(score, bool)
+            or not isinstance(score, int)
+            or not 0 <= score <= 1000
+        ):
+            validation_error = True
+            break
+        score_by_id[memory_id] = score
+
+    if validation_error:
+        return [
+            {
+                "memory_id": memory_id,
+                "semantic": {
+                    "status": "FAILED",
+                    "provider": provider,
+                    "model": model,
+                    "score_milli": None,
+                    "error_type": "MemoryRetrievalError",
+                },
+            }
+            for memory_id in deterministic_ids
+        ]
+
+    return [
+        {
+            "memory_id": memory_id,
+            "semantic": {
+                "status": (
+                    "SCORED" if memory_id in score_by_id else "MISSING"
+                ),
+                "provider": provider,
+                "model": model,
+                "score_milli": score_by_id.get(memory_id),
+                "error_type": None,
+            },
+        }
+        for memory_id in deterministic_ids
+    ]
+
+
+def assert_semantic_invariants(
+    fixture: dict[str, Any],
+    path: Path,
+    memories: list[dict[str, Any]],
+) -> None:
+    cases = fixture.get("given", {}).get("semantic_cases", [])
+    if not cases:
+        return
+    if not isinstance(cases, list):
+        raise ValidationFailure(f"{path}: semantic_cases must be an array")
+
+    retrieval_cases = fixture.get("given", {}).get("retrieval_cases", [])
+    retrieval_by_id = {
+        case.get("case_id"): case
+        for case in retrieval_cases
+        if isinstance(case, dict)
+    }
+    seen_ids: set[str] = set()
+    for index, case in enumerate(cases):
+        if not isinstance(case, dict):
+            raise ValidationFailure(
+                f"{path}: semantic_cases[{index}] must be an object"
+            )
+        case_id = case.get("case_id")
+        if not isinstance(case_id, str) or not case_id:
+            raise ValidationFailure(f"{path}: semantic case requires case_id")
+        if case_id in seen_ids:
+            raise ValidationFailure(
+                f"{path}: duplicate semantic case_id {case_id!r}"
+            )
+        seen_ids.add(case_id)
+
+        retrieval_case_id = case.get("retrieval_case_id")
+        retrieval_case = retrieval_by_id.get(retrieval_case_id)
+        if retrieval_case is None:
+            raise ValidationFailure(
+                f"{path}:{case_id}: unknown retrieval_case_id "
+                f"{retrieval_case_id!r}"
+            )
+
+        deterministic = _evaluate_retrieval_case(
+            memories,
+            retrieval_case,
+            path,
+        )
+        deterministic_ids = [
+            item["memory_id"] for item in deterministic
+        ]
+        actual_expected = case.get("expect", {}).get("hits")
+        if not isinstance(actual_expected, list):
+            raise ValidationFailure(
+                f"{path}:{case_id}: expect.hits must be an array"
+            )
+
+        derived = _semantic_expected_hits(
+            deterministic_ids=deterministic_ids,
+            scorer=case.get("scorer"),
+            path=path,
+            case_id=case_id,
+        )
+        if derived != actual_expected:
+            raise ValidationFailure(
+                f"{path}:{case_id}: semantic result mismatch\n"
+                f"expected={actual_expected!r}\nderived={derived!r}"
+            )
+
+        for hit in actual_expected:
+            semantic = hit.get("semantic", {})
+            if semantic.get("status") not in _SEMANTIC_STATUSES:
+                raise ValidationFailure(
+                    f"{path}:{case_id}: unsupported semantic status"
+                )
+
 def assert_invariants(fixture: dict[str, Any], path: Path) -> None:
     given = fixture.get("given", {})
     task = given.get("active_task")
@@ -600,6 +792,7 @@ def assert_invariants(fixture: dict[str, Any], path: Path) -> None:
     assert_journal_invariants(fixture, path, journal_events)
     assert_memory_invariants(fixture, path, memory_records)
     assert_retrieval_invariants(fixture, path, memory_records)
+    assert_semantic_invariants(fixture, path, memory_records)
 
 
 def validate_fixture(path: Path) -> None:

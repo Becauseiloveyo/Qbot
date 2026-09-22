@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from datetime import UTC, datetime
@@ -9,6 +10,7 @@ from qbot.config import QbotConfig
 from qbot.memory_retrieval import MemoryQuery, MemoryRetriever
 from qbot.persistence import Database
 from qbot.persistence.memory import MemoryRepository
+from qbot.persistence.tables import memories
 from qbot.semantic_memory import (
     NoopSemanticRelevanceScorer,
     SemanticRelevanceScorer,
@@ -51,6 +53,37 @@ class FailingSemanticScorer(SemanticRelevanceScorer):
     async def score(self, request):
         del request
         raise RuntimeError("embedding service unavailable")
+
+
+class FixtureSemanticScorer(SemanticRelevanceScorer):
+    def __init__(
+        self,
+        *,
+        provider: str,
+        model: str | None,
+        outputs: list[dict[str, object]],
+    ) -> None:
+        self._provider = provider
+        self._model = model
+        self._outputs = outputs
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider
+
+    @property
+    def model_name(self) -> str | None:
+        return self._model
+
+    async def score(self, request):
+        del request
+        return tuple(
+            SemanticScore(
+                memory_id=str(item["memory_id"]),
+                score_milli=int(item["score_milli"]),
+            )
+            for item in self._outputs
+        )
 
 
 class SemanticMemoryRetrievalTests(unittest.IsolatedAsyncioTestCase):
@@ -279,6 +312,135 @@ class SemanticMemoryRetrievalTests(unittest.IsolatedAsyncioTestCase):
                 for hit in enriched
             )
         )
+
+
+    async def test_shared_cross_runtime_semantic_contract_fixture(self) -> None:
+        fixture_path = (
+            Path(__file__).resolve().parents[2]
+            / "tests"
+            / "conformance"
+            / "memory-retrieval-parity.json"
+        )
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        given = fixture["given"]
+
+        with self.db.transaction() as conn:
+            for item in given["memories"]:
+                provenance = item["provenance"]
+                conn.execute(
+                    memories.insert().values(
+                        schema_version=item["schema_version"],
+                        memory_id=item["memory_id"],
+                        state=item["state"],
+                        scope=item["scope"],
+                        owner_id=item.get("owner_id"),
+                        conversation_id=item.get("conversation_id"),
+                        task_id=item.get("task_id"),
+                        content=item["content"],
+                        entities_json=json.dumps(
+                            item.get("entities", []),
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
+                        importance=item.get("importance"),
+                        trust=item["trust"],
+                        confidence=item.get("confidence"),
+                        source_type=provenance["source_type"],
+                        source_message_id=provenance.get("source_message_id"),
+                        source_event_id=provenance.get("source_event_id"),
+                        valid_from=item.get("valid_from"),
+                        valid_to=item.get("valid_to"),
+                        supersedes=item.get("supersedes"),
+                        created_at=item["created_at"],
+                    )
+                )
+
+        retrieval_cases = {
+            case["case_id"]: case
+            for case in given["retrieval_cases"]
+        }
+        for semantic_case in given["semantic_cases"]:
+            with self.subTest(case_id=semantic_case["case_id"]):
+                retrieval_case = retrieval_cases[
+                    semantic_case["retrieval_case_id"]
+                ]
+                raw_query = retrieval_case["query"]
+                query = MemoryQuery(
+                    scopes=tuple(raw_query["scopes"]),
+                    text=raw_query.get("text", ""),
+                    owner_id=raw_query.get("owner_id"),
+                    conversation_id=raw_query.get("conversation_id"),
+                    task_id=raw_query.get("task_id"),
+                    entities=tuple(raw_query.get("entities", [])),
+                    min_trust=raw_query.get("min_trust", 0.0),
+                    limit=raw_query.get("limit", 10),
+                )
+                now = datetime.fromisoformat(
+                    retrieval_case["evaluation_time"].replace(
+                        "Z",
+                        "+00:00",
+                    )
+                )
+
+                raw_scorer = semantic_case.get("scorer")
+                if raw_scorer is None:
+                    scorer = None
+                elif raw_scorer["behavior"] == "unavailable":
+                    scorer = NoopSemanticRelevanceScorer()
+                else:
+                    scorer = FixtureSemanticScorer(
+                        provider=raw_scorer["provider"],
+                        model=raw_scorer.get("model"),
+                        outputs=raw_scorer.get("outputs", []),
+                    )
+
+                deterministic = self.retriever.retrieve(query, now=now)
+                enriched = await self.retriever.retrieve_with_semantics(
+                    query,
+                    scorer=scorer,
+                    now=now,
+                )
+                expected = semantic_case["expect"]["hits"]
+
+                self.assertEqual(
+                    [hit.record.memory_id for hit in deterministic],
+                    [hit.record.memory_id for hit in enriched],
+                )
+                self.assertEqual(
+                    [hit.score for hit in deterministic],
+                    [hit.score for hit in enriched],
+                )
+                self.assertEqual(
+                    [item["memory_id"] for item in expected],
+                    [hit.record.memory_id for hit in enriched],
+                )
+                for hit, expected_hit in zip(
+                    enriched,
+                    expected,
+                    strict=True,
+                ):
+                    audit = expected_hit["semantic"]
+                    self.assertEqual(
+                        audit["status"],
+                        hit.semantic.status.value,
+                    )
+                    self.assertEqual(
+                        audit["provider"],
+                        hit.semantic.provider,
+                    )
+                    self.assertEqual(
+                        audit["model"],
+                        hit.semantic.model,
+                    )
+                    self.assertEqual(
+                        audit["score_milli"],
+                        hit.semantic.score_milli,
+                    )
+                    self.assertEqual(
+                        audit["error_type"],
+                        hit.semantic.error_type,
+                    )
+
 
 
 if __name__ == "__main__":

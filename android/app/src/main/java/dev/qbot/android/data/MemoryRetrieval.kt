@@ -63,6 +63,7 @@ data class MemoryScore(
 data class MemoryHit(
     val record: MemoryRecord,
     val score: MemoryScore,
+    val semantic: SemanticAudit? = null,
 )
 
 data class MemoryScoringWeights(
@@ -182,6 +183,109 @@ class MemoryRetriever(
         return hits
             .sortedWith(hitComparator)
             .take(query.limit)
+    }
+
+    suspend fun retrieveWithSemantics(
+        query: MemoryQuery,
+        scorer: SemanticRelevanceScorer? = null,
+        now: Instant = Instant.now(),
+    ): List<MemoryHit> {
+        val hits = retrieve(query = query, now = now)
+        if (hits.isEmpty()) return hits
+
+        if (scorer == null) {
+            val audit = SemanticAudit(
+                status = SemanticScoreStatus.DISABLED,
+            )
+            return hits.map { it.copy(semantic = audit) }
+        }
+
+        val provider = scorer.providerName.trim().ifEmpty {
+            scorer::class.java.simpleName.ifBlank {
+                "unknown-semantic-provider"
+            }
+        }
+        val model = scorer.modelName
+        val request = SemanticScoringRequest(
+            queryText = normalizeText(query.text),
+            queryEntities = normalizedUnique(query.entities),
+            candidates = hits.map { hit ->
+                SemanticCandidate(
+                    memoryId = hit.record.memoryId,
+                    content = hit.record.content,
+                    entities = hit.record.entities,
+                )
+            },
+        )
+
+        val scoreById =
+            try {
+                validateSemanticScores(
+                    scores = scorer.score(request),
+                    eligibleIds = hits
+                        .map { it.record.memoryId }
+                        .toSet(),
+                )
+            } catch (error: SemanticScorerUnavailable) {
+                val audit = SemanticAudit(
+                    status = SemanticScoreStatus.UNAVAILABLE,
+                    provider = provider,
+                    model = model,
+                    errorType = error::class.java.simpleName,
+                )
+                return hits.map { it.copy(semantic = audit) }
+            } catch (error: Exception) {
+                val audit = SemanticAudit(
+                    status = SemanticScoreStatus.FAILED,
+                    provider = provider,
+                    model = model,
+                    errorType = error::class.java.simpleName,
+                )
+                return hits.map { it.copy(semantic = audit) }
+            }
+
+        return hits.map { hit ->
+            val scoreMilli = scoreById[hit.record.memoryId]
+            hit.copy(
+                semantic = SemanticAudit(
+                    status =
+                        if (scoreMilli == null) {
+                            SemanticScoreStatus.MISSING
+                        } else {
+                            SemanticScoreStatus.SCORED
+                        },
+                    provider = provider,
+                    model = model,
+                    scoreMilli = scoreMilli,
+                ),
+            )
+        }
+    }
+
+    private fun validateSemanticScores(
+        scores: List<SemanticScore>,
+        eligibleIds: Set<String>,
+    ): Map<String, Int> {
+        val result = linkedMapOf<String, Int>()
+        for (item in scores) {
+            if (item.memoryId !in eligibleIds) {
+                throw MemoryRetrievalError(
+                    "semantic scorer returned an ineligible memory_id",
+                )
+            }
+            if (item.memoryId in result) {
+                throw MemoryRetrievalError(
+                    "semantic scorer returned duplicate memory_id",
+                )
+            }
+            if (item.scoreMilli !in 0..1000) {
+                throw MemoryRetrievalError(
+                    "semantic score_milli must be between 0 and 1000",
+                )
+            }
+            result[item.memoryId] = item.scoreMilli
+        }
+        return result
     }
 
     private suspend fun ftsCandidateIds(

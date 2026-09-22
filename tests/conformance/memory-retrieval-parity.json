@@ -520,9 +520,197 @@
           ]
         }
       }
+    ],
+    "semantic_cases": [
+      {
+        "case_id": "disabled-preserves-deterministic-order",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": null,
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "DISABLED",
+                "provider": null,
+                "model": null,
+                "score_milli": null,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "DISABLED",
+                "provider": null,
+                "model": null,
+                "score_milli": null,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "DISABLED",
+                "provider": null,
+                "model": null,
+                "score_milli": null,
+                "error_type": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "unavailable-preserves-deterministic-order",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": {
+          "behavior": "unavailable",
+          "provider": "noop",
+          "model": null,
+          "outputs": []
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "UNAVAILABLE",
+                "provider": "noop",
+                "model": null,
+                "score_milli": null,
+                "error_type": "SemanticScorerUnavailable"
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "UNAVAILABLE",
+                "provider": "noop",
+                "model": null,
+                "score_milli": null,
+                "error_type": "SemanticScorerUnavailable"
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "UNAVAILABLE",
+                "provider": "noop",
+                "model": null,
+                "score_milli": null,
+                "error_type": "SemanticScorerUnavailable"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "partial-scores-are-advisory",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": {
+          "behavior": "scores",
+          "provider": "fixed-contract",
+          "model": "semantic-contract-v1",
+          "outputs": [
+            {
+              "memory_id": "mem-alpha",
+              "score_milli": 10
+            },
+            {
+              "memory_id": "mem-beta",
+              "score_milli": 1000
+            }
+          ]
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "SCORED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": 10,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "MISSING",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": null
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "SCORED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": 1000,
+                "error_type": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "unknown-id-fails-closed",
+        "retrieval_case_id": "state-domain-time-score",
+        "scorer": {
+          "behavior": "scores",
+          "provider": "fixed-contract",
+          "model": "semantic-contract-v1",
+          "outputs": [
+            {
+              "memory_id": "mem-other-domain",
+              "score_milli": 1000
+            }
+          ]
+        },
+        "expect": {
+          "hits": [
+            {
+              "memory_id": "mem-alpha",
+              "semantic": {
+                "status": "FAILED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": "MemoryRetrievalError"
+              }
+            },
+            {
+              "memory_id": "mem-gamma",
+              "semantic": {
+                "status": "FAILED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": "MemoryRetrievalError"
+              }
+            },
+            {
+              "memory_id": "mem-beta",
+              "semantic": {
+                "status": "FAILED",
+                "provider": "fixed-contract",
+                "model": "semantic-contract-v1",
+                "score_milli": null,
+                "error_type": "MemoryRetrievalError"
+              }
+            }
+          ]
+        }
+      }
     ]
   },
   "expect": {
-    "cross_runtime_retrieval_parity": true
+    "cross_runtime_retrieval_parity": true,
+    "cross_runtime_semantic_advisory_parity": true
   }
 }
