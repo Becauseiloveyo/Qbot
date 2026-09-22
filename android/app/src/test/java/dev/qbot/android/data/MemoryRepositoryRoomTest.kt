@@ -217,11 +217,23 @@ class MemoryRepositoryRoomTest {
     }
 
     @Test
-    fun migrationRegistryContainsExplicitV1ToV2Step() {
-        assertEquals(1, QbotMigrations.ALL.size)
-        val migration = QbotMigrations.ALL.single()
-        assertEquals(1, migration.startVersion)
-        assertEquals(2, migration.endVersion)
-        assertTrue(QbotMigrations.ALL.contains(QbotMigrations.MIGRATION_1_2))
+    fun migrationRegistryContainsExplicitV1ToV3Path() {
+        assertEquals(2, QbotMigrations.ALL.size)
+        assertEquals(
+            listOf(1 to 2, 2 to 3),
+            QbotMigrations.ALL.map {
+                it.startVersion to it.endVersion
+            },
+        )
+        assertTrue(
+            QbotMigrations.ALL.contains(
+                QbotMigrations.MIGRATION_1_2,
+            ),
+        )
+        assertTrue(
+            QbotMigrations.ALL.contains(
+                QbotMigrations.MIGRATION_2_3,
+            ),
+        )
     }
 }

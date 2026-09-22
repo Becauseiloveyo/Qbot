@@ -20,8 +20,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PersonaEntity::class,
         ContactProfileEntity::class,
         MemoryEntity::class,
+        ConversationSummaryEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class QbotDatabase : RoomDatabase() {
@@ -98,5 +99,30 @@ object QbotMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `conversation_summaries` (
+                    `conversation_id` TEXT NOT NULL,
+                    `schema_version` TEXT NOT NULL,
+                    `summary` TEXT NOT NULL,
+                    `source_digest` TEXT NOT NULL,
+                    `source_event_count` INTEGER NOT NULL,
+                    `source_from_at` TEXT,
+                    `source_to_at` TEXT,
+                    `provider` TEXT,
+                    `model` TEXT,
+                    `updated_at` TEXT NOT NULL,
+                    PRIMARY KEY(`conversation_id`)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(
+        MIGRATION_1_2,
+        MIGRATION_2_3,
+    )
 }

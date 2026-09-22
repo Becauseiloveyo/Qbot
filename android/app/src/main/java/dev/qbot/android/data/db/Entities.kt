@@ -394,3 +394,26 @@ data class MemoryEntity(
     val createdAt: String,
 )
 
+
+@Entity(tableName = "conversation_summaries")
+data class ConversationSummaryEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "conversation_id")
+    val conversationId: String,
+    @ColumnInfo(name = "schema_version")
+    val schemaVersion: String,
+    val summary: String,
+    @ColumnInfo(name = "source_digest")
+    val sourceDigest: String,
+    @ColumnInfo(name = "source_event_count")
+    val sourceEventCount: Int,
+    @ColumnInfo(name = "source_from_at")
+    val sourceFromAt: String?,
+    @ColumnInfo(name = "source_to_at")
+    val sourceToAt: String?,
+    val provider: String?,
+    val model: String?,
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: String,
+)
+

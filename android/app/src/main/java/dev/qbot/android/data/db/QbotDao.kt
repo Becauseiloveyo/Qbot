@@ -26,6 +26,34 @@ interface QbotDao {
     @Query("SELECT COUNT(*) FROM inbound_events")
     suspend fun inboundCount(): Int
 
+    @Query(
+        """
+        SELECT * FROM inbound_events
+        WHERE conversation_id = :conversationId
+          AND event_type = 'MESSAGE_RECEIVED'
+          AND text IS NOT NULL
+        ORDER BY received_at DESC, event_id DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun recentMessageEvents(
+        conversationId: String,
+        limit: Int,
+    ): List<InboundEventEntity>
+
+    @Query(
+        """
+        SELECT * FROM inbound_events
+        WHERE event_type = 'MESSAGE_RECEIVED'
+          AND text IS NOT NULL
+        ORDER BY received_at DESC, event_id DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun recentMessageEventsForMaintenance(
+        limit: Int,
+    ): List<InboundEventEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAgentRun(run: AgentRunEntity)
 
@@ -289,5 +317,21 @@ interface QbotDao {
         """,
     )
     suspend fun journalForRelated(relatedId: String): List<JournalEntity>
+
+    @Upsert
+    suspend fun upsertConversationSummary(
+        summary: ConversationSummaryEntity,
+    )
+
+    @Query(
+        """
+        SELECT * FROM conversation_summaries
+        WHERE conversation_id = :conversationId
+        LIMIT 1
+        """,
+    )
+    suspend fun conversationSummary(
+        conversationId: String,
+    ): ConversationSummaryEntity?
 
 }

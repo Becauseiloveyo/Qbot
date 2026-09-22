@@ -44,11 +44,11 @@ jobs:
 
       - name: Verify Room schema export
         run: |
-          test -f android/app/schemas/dev.qbot.android.data.db.QbotDatabase/2.json
+          test -f android/app/schemas/dev.qbot.android.data.db.QbotDatabase/3.json
 
       - name: Upload Room schema
         uses: actions/upload-artifact@v4
         with:
-          name: qbot-room-schema-v2
+          name: qbot-room-schema-v3
           path: android/app/schemas
           if-no-files-found: error

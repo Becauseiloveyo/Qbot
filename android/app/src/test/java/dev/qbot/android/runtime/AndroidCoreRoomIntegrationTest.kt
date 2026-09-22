@@ -30,6 +30,20 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
+private class RecordingMemoryMaintenanceScheduler :
+    MemoryMaintenanceScheduler {
+    val eventIds = mutableListOf<String>()
+    var catchUpCalls: Int = 0
+
+    override fun enqueue(eventId: String) {
+        eventIds += eventId
+    }
+
+    override fun enqueueCatchUp() {
+        catchUpCalls += 1
+    }
+}
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [37], application = Application::class)
 class AndroidCoreRoomIntegrationTest {
@@ -66,6 +80,8 @@ class AndroidCoreRoomIntegrationTest {
         transport.start()
 
         val ids = AtomicInteger(0)
+        val maintenanceScheduler =
+            RecordingMemoryMaintenanceScheduler()
         val core = AndroidCore(
             transport = transport,
             admission = InboundAdmissionRepository(
@@ -74,6 +90,7 @@ class AndroidCoreRoomIntegrationTest {
             ),
             runRepository = AgentRunRepository(database.qbotDao()),
             stateRepository = DurableStateRepository(database.qbotDao()),
+            memoryMaintenanceScheduler = maintenanceScheduler,
             normalizer = EventNormalizer(
                 transportName = transport.name,
                 clock = Clock.fixed(
@@ -95,6 +112,10 @@ class AndroidCoreRoomIntegrationTest {
         assertEquals(1, database.qbotDao().inboundCount())
         assertEquals(1, database.qbotDao().agentRunCount())
         assertEquals(2, database.qbotDao().journalCount())
+        assertEquals(
+            listOf(first.admission.eventId),
+            maintenanceScheduler.eventIds,
+        )
         assertEquals("RESTORING", first.restored.run.status)
         assertNull(first.restored.activeTask)
         assertNull(first.restored.checkpoint)

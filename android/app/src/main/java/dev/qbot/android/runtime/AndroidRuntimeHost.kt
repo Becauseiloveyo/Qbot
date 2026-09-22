@@ -5,6 +5,7 @@ import dev.qbot.android.data.AgentRunRepository
 import dev.qbot.android.data.DurableStateRepository
 import dev.qbot.android.data.InboundAdmissionRepository
 import dev.qbot.android.data.db.QbotDatabaseProvider
+import dev.qbot.android.work.WorkManagerMemoryMaintenanceScheduler
 import dev.qbot.android.transport.notification.NotificationTransportProvider
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
@@ -33,11 +34,15 @@ class AndroidRuntimeHost(
         val transport =
             NotificationTransportProvider.get(applicationContext)
         val dao = database.qbotDao()
+        val memoryMaintenance =
+            WorkManagerMemoryMaintenanceScheduler(applicationContext)
+        memoryMaintenance.enqueueCatchUp()
         val core = AndroidCore(
             transport = transport,
             admission = InboundAdmissionRepository(database),
             runRepository = AgentRunRepository(dao),
             stateRepository = DurableStateRepository(dao),
+            memoryMaintenanceScheduler = memoryMaintenance,
         )
 
         scope.launch {

@@ -17,6 +17,7 @@ class AndroidCore(
     private val admission: InboundAdmissionRepository,
     private val runRepository: AgentRunRepository,
     private val stateRepository: DurableStateRepository,
+    private val memoryMaintenanceScheduler: MemoryMaintenanceScheduler? = null,
     private val locks: ConversationLockManager = ConversationLockManager(),
     private val normalizer: EventNormalizer = EventNormalizer(
         transportName = transport.name,
@@ -32,9 +33,13 @@ class AndroidCore(
         ) {
             val admitted = admission.admit(event)
             runRepository.beginRestore(admitted.runId)
+            val restored = stateRepository.restore(admitted.runId)
+            if (admitted.isNew) {
+                memoryMaintenanceScheduler?.enqueue(admitted.eventId)
+            }
             AndroidProcessResult(
                 admission = admitted,
-                restored = stateRepository.restore(admitted.runId),
+                restored = restored,
             )
         }
     }
