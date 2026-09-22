@@ -246,3 +246,19 @@ Index(
     "ix_memories_source_event",
     memories.c.source_event_id,
 )
+
+
+conversation_summaries = Table(
+    "conversation_summaries",
+    metadata,
+    Column("conversation_id", String, primary_key=True),
+    Column("schema_version", String, nullable=False),
+    Column("summary", Text, nullable=False),
+    Column("source_digest", String, nullable=False),
+    Column("source_event_count", Integer, nullable=False),
+    Column("source_from_at", String),
+    Column("source_to_at", String),
+    Column("provider", String),
+    Column("model", String),
+    Column("updated_at", String, nullable=False),
+)

@@ -64,12 +64,14 @@ class DesktopRuntime:
             reply_flow=self.core.reply_flow,
         )
         self.recovery_report = await executor.run(recovery_mode)
+        self.core.schedule_memory_catch_up()
         return RuntimeStartReport(
             bootstrap=bootstrap,
             recovery=self.recovery_report,
         )
 
     async def stop(self) -> None:
+        await self.core.drain_memory_maintenance()
         if self._transport_started:
             await self.transport.stop()
             self._transport_started = False

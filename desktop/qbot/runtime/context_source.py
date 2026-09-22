@@ -94,6 +94,7 @@ class DurableSqliteContextSource(ContextSource):
             active_task=snapshot.active_task,
             checkpoint=snapshot.checkpoint,
             important_decisions=snapshot.important_decisions,
+            rolling_summary=snapshot.rolling_summary,
             recent_messages=snapshot.recent_messages,
             current_message=event.text or "",
         )

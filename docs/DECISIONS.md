@@ -164,3 +164,15 @@ Decision: v0.7 introduces a provider-neutral asynchronous `SemanticRelevanceScor
 The semantic path is explicit opt-in through `retrieve_with_semantics()`. With no scorer configured it returns the same deterministic hits marked DISABLED. An intentionally unavailable backend returns the same hits marked UNAVAILABLE. Provider exceptions, duplicate IDs, unknown/ineligible IDs, non-integer scores, and scores outside 0-1000 fail closed to semantic metadata marked FAILED; deterministic IDs, ordering, and scores are preserved. Active Task/Checkpoint restoration remains a separate direct durable-state path and is never supplied to the semantic scorer.
 
 Reason: embedding providers are optional, failure-prone, and may differ across platforms/models. Freezing a non-authoritative scorer contract first provides semantic observability without weakening trust/domain boundaries or making core correctness depend on embeddings. Any future semantic reranking or score fusion requires a separate explicit decision and cross-runtime contract rather than silently changing ADR-021 ranking semantics.
+
+## ADR-025 — Background memory maintenance produces candidates and derived summaries only
+
+Decision: v0.7 background memory maintenance is best-effort and non-authoritative. For each durably admitted external MESSAGE_RECEIVED event, the MEMORY model may propose only CONTACT_PROFILE, CONVERSATION_MEMORY, or TASK_MEMORY candidates. Qbot binds source_type=CONTACT, source_event_id/source_message_id, conversation/contact/task identity, and a conservative trust score from durable event state; the model cannot supply or override those fields. Parsed proposals are staged through MemoryRepository.create_candidate() and are never promoted by the maintenance path.
+
+Successful extraction is journaled as MEMORY_EXTRACTION_COMPLETED so replay/restart is idempotent even when the model returns zero candidates. Failed or invalid model output creates no completion marker and no partial candidate set, so it may be retried later. The maintenance path never writes SYSTEM_POLICY, USER_PERSONA, Active Task, or Checkpoint.
+
+Rolling conversation summaries are persisted separately in conversation_summaries as replaceable derived context keyed by conversation_id. A SHA-256 digest of the bounded durable message window prevents redundant regeneration across retries and restarts. The summary is optional context rendered as DERIVED_ROLLING_SUMMARY and is explicitly subordinate to System Policy, Persona, Active Task, and Checkpoint. Summary/model failures are no-ops for authoritative state.
+
+Desktop DB schema v5 adds only conversation_summaries. It contains summary text, source digest/window metadata, provider/model provenance, and update time; it has no foreign-key path capable of mutating Task/Checkpoint/Persona/Memory authority.
+
+Reason: background LLM work is useful for long-context compression and candidate discovery, but it is exactly the wrong place to grant implicit authority. Durable provenance binding, candidate-only staging, digest idempotency, and a separate derived-summary store keep model failure or prompt injection from becoming trusted state.

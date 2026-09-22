@@ -300,6 +300,26 @@ Recommended indexes:
 
 Desktop may add SQLite FTS5 tables later without changing the logical memory contract. Android may use Room FTS once the retrieval milestone begins.
 
+
+## conversation_summaries
+
+Rolling summaries are derived optional context, not authoritative memory.
+
+Columns:
+
+- `conversation_id` PRIMARY KEY
+- `schema_version`
+- `summary`
+- `source_digest`
+- `source_event_count`
+- `source_from_at`
+- `source_to_at`
+- `provider`
+- `model`
+- `updated_at`
+
+The source digest is computed from the bounded durable message window and is the idempotency barrier for regeneration. A rolling summary may be replaced when the window changes, but it cannot mutate or supersede System Policy, Persona, Active Task, Checkpoint, or promoted Memory. Model failure leaves the previous summary unchanged.
+
 ## policy_decisions
 
 Source contract: `spec/policy-decision.schema.json`
